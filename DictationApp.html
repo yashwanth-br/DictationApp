@@ -191,18 +191,34 @@
             overflow: hidden;
         }
         
+        #dynamicContentWrapper {
+            position: relative;
+            width: 100%;
+            max-width: 350px;
+            min-height: 110px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
         .hidable {
             transition: opacity 0.4s ease, transform 0.4s ease;
             opacity: 1;
             transform: translateY(0);
+            position: absolute;
+            left: 0;
+            right: 0;
+            margin: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
         }
         .hidable.is-hidden {
             opacity: 0;
             pointer-events: none;
             transform: translateY(10px);
-            position: absolute;
         }
-        #liveWaveformCanvas { height: 60px; width: 100%; margin-bottom: 15px; }
+        #liveWaveformCanvas { height: 60px; width: 100%; }
 
         .mic-selector-wrapper {
             display: flex;
@@ -225,12 +241,20 @@
             outline: 2px solid var(--color-recording);
             border-color: var(--color-recording);
         }
-
+        
+        /* --- Styles for the new "split" button animation --- */
         .button-wrapper {
-            display: flex;
-            align-items: center;
-            gap: 20px;
+            position: relative;
+            width: 100%;
+            height: 70px; /* Match record button height */
             margin-top: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #recordButton, #cancelButton {
+            position: absolute; /* Layer buttons in the center */
         }
 
         #recordButton {
@@ -244,9 +268,18 @@
             justify-content: center;
             align-items: center;
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            transition: transform 0.2s, box-shadow 0.2s, background-color 0.3s;
+            z-index: 2; /* Keep record button on top */
+            transition: transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28), box-shadow 0.2s;
         }
         #recordButton:hover { transform: scale(1.05); }
+        .button-wrapper.is-recording #recordButton:hover {
+             transform: translateX(-45px) scale(1.05);
+        }
+
+        .button-wrapper.is-recording #recordButton {
+            transform: translateX(-45px);
+        }
+
         #recordButton.recording {
             animation: pulse-record 2s infinite;
         }
@@ -282,14 +315,23 @@
             justify-content: center;
             align-items: center;
             font-size: 1.2em;
-            transition: background-color 0.2s, color 0.2s, opacity 0.4s, transform 0.4s;
+            opacity: 0;
+            transform: scale(0.5); /* Start small and centered */
+            pointer-events: none;
+            transition: background-color 0.2s, color 0.2s, opacity 0.4s ease, transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
         }
+        
+        .button-wrapper.is-recording #cancelButton {
+            opacity: 1;
+            transform: translateX(45px) scale(1); /* Move right and scale up */
+            pointer-events: auto;
+        }
+        
         #cancelButton:hover {
             background-color: var(--color-cancel);
             color: white;
         }
         
-        /* --- New Progress Bar Styles --- */
         .progress-indicator {
             width: 100%;
             max-width: 350px;
@@ -308,7 +350,7 @@
         }
         .progress-line-bg {
             position: absolute;
-            top: 26px; /* Align with the center of the dots */
+            top: 26px;
             left: 15%;
             right: 15%;
             height: 4px;
@@ -327,7 +369,7 @@
         }
         .progress-step {
             display: flex;
-            flex-direction: column; /* Stack dot and label */
+            flex-direction: column;
             align-items: center;
             gap: 8px;
             font-size: 0.9em;
@@ -346,7 +388,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background-color: var(--bg-color); /* To hide the line behind it */
+            background-color: var(--bg-color);
             border-radius: 50%;
             padding: 4px;
         }
@@ -421,21 +463,24 @@
 
         <footer>
             <div class="recording-interface">
-                <div class="status-indicator hidable" id="recordingStatus">Ready to record</div>
-                <!-- Updated Progress Bar HTML -->
-                <div class="progress-indicator hidable is-hidden" id="progressIndicator">
-                    <div class="progress-line-bg">
-                        <div class="progress-line-fill" id="progressLineFill"></div>
+                <div id="dynamicContentWrapper">
+                    <div class="status-indicator hidable" id="recordingStatus">Ready to record</div>
+                    <div class="progress-indicator hidable is-hidden" id="progressIndicator">
+                        <div class="progress-line-bg">
+                            <div class="progress-line-fill" id="progressLineFill"></div>
+                        </div>
+                        <div class="progress-steps-container">
+                            <div class="progress-step" id="step1"><div class="dot-container"><div class="dot"></div><i class="fa-solid fa-check checkmark"></i></div><span class="label">Transcribing</span></div>
+                            <div class="progress-step" id="step2"><div class="dot-container"><div class="dot"></div><i class="fa-solid fa-check checkmark"></i></div><span class="label">Cleaning</span></div>
+                            <div class="progress-step" id="step3"><div class="dot-container"><div class="dot"></div><i class="fa-solid fa-check checkmark"></i></div><span class="label">Polishing</span></div>
+                        </div>
                     </div>
-                    <div class="progress-steps-container">
-                        <div class="progress-step" id="step1"><div class="dot-container"><div class="dot"></div><i class="fa-solid fa-check checkmark"></i></div><span class="label">Transcribing</span></div>
-                        <div class="progress-step" id="step2"><div class="dot-container"><div class="dot"></div><i class="fa-solid fa-check checkmark"></i></div><span class="label">Cleaning</span></div>
-                        <div class="progress-step" id="step3"><div class="dot-container"><div class="dot"></div><i class="fa-solid fa-check checkmark"></i></div><span class="label">Polishing</span></div>
+                    <div class="hidable is-hidden" id="liveDisplayWrapper">
+                        <div id="liveRecordingTitle"></div>
+                        <canvas id="liveWaveformCanvas"></canvas>
+                        <div id="liveRecordingTimerDisplay">00:00.00</div>
                     </div>
                 </div>
-                <div id="liveRecordingTitle" class="hidable is-hidden"></div>
-                <canvas id="liveWaveformCanvas" class="hidable is-hidden"></canvas>
-                <div id="liveRecordingTimerDisplay" class="hidable is-hidden">00:00.00</div>
                 
                 <div class="mic-selector-wrapper">
                     <i class="fa-solid fa-microphone-lines"></i>
@@ -446,7 +491,7 @@
                     <button id="recordButton" title="Start Recording">
                         <div class="record-button-inner"><i class="fa-solid fa-microphone"></i></div>
                     </button>
-                    <button id="cancelButton" title="Cancel Recording" class="hidable is-hidden"><i class="fa-solid fa-xmark"></i></button>
+                    <button id="cancelButton" title="Cancel Recording"><i class="fa-solid fa-xmark"></i></button>
                 </div>
             </div>
         </footer>
@@ -491,6 +536,7 @@
                 // Main UI
                 this.recordButton = document.getElementById('recordButton');
                 this.cancelButton = document.getElementById('cancelButton');
+                this.buttonWrapper = document.querySelector('.button-wrapper');
                 this.newButton = document.getElementById('newButton');
                 this.themeToggleButton = document.getElementById('themeToggleButton');
                 this.themeToggleIcon = this.themeToggleButton.querySelector('i');
@@ -508,7 +554,8 @@
                 // Dynamic Displays
                 this.recordingStatus = document.getElementById('recordingStatus');
                 this.progressIndicator = document.getElementById('progressIndicator');
-                this.progressLineFill = document.getElementById('progressLineFill'); // New element
+                this.progressLineFill = document.getElementById('progressLineFill');
+                this.liveDisplayWrapper = document.getElementById('liveDisplayWrapper');
                 this.liveRecordingTitle = document.getElementById('liveRecordingTitle');
                 this.liveWaveformCanvas = document.getElementById('liveWaveformCanvas');
                 this.liveWaveformCtx = this.liveWaveformCanvas.getContext('2d');
@@ -656,11 +703,9 @@
             }
 
             startLiveDisplay() {
-                this.liveRecordingTitle.classList.remove('is-hidden');
-                this.liveWaveformCanvas.classList.remove('is-hidden');
-                this.liveRecordingTimerDisplay.classList.remove('is-hidden');
+                this.liveDisplayWrapper.classList.remove('is-hidden');
                 this.recordingStatus.classList.add('is-hidden');
-                this.cancelButton.classList.remove('is-hidden');
+                this.buttonWrapper.classList.add('is-recording');
                 
                 this.setupCanvasDimensions();
                 this.recordButton.querySelector('i').classList.replace('fa-microphone', 'fa-stop');
@@ -678,11 +723,9 @@
             }
 
             stopLiveDisplay() {
-                this.liveRecordingTitle.classList.add('is-hidden');
-                this.liveWaveformCanvas.classList.add('is-hidden');
-                this.liveRecordingTimerDisplay.classList.add('is-hidden');
+                this.liveDisplayWrapper.classList.add('is-hidden');
                 this.recordingStatus.classList.remove('is-hidden');
-                this.cancelButton.classList.add('is-hidden');
+                this.buttonWrapper.classList.remove('is-recording');
                 
                 this.recordButton.querySelector('i').classList.replace('fa-stop', 'fa-microphone');
                 
@@ -700,7 +743,6 @@
                     this.audioChunks = [];
                     this.maxVolumeDuringRecording = 0;
                     this.isCancelled = false;
-                    this.recordingStatus.textContent = 'Recording...';
                     
                     const selectedMicId = this.micSelect.value;
                     this.stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: selectedMicId ? { exact: selectedMicId } : undefined } });
@@ -774,10 +816,10 @@
                 return { inlineData: { data: base64Data, mimeType } };
             }
 
-            // --- Updated updateProgress function ---
             updateProgress(stage) {
-                this.progressIndicator.classList.toggle('is-hidden', stage === 'off');
-                this.recordingStatus.classList.toggle('is-hidden', stage !== 'off');
+                const isOff = stage === 'off';
+                this.progressIndicator.classList.toggle('is-hidden', isOff);
+                this.recordingStatus.classList.toggle('is-hidden', !isOff);
                 
                 let scaleX = 0;
                 if (stage === 'processing') scaleX = 0.5;
