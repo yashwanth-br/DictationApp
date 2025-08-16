@@ -137,6 +137,7 @@
             box-shadow: 0 8px 25px var(--shadow-color);
         }
         
+        /* --- Shine Effect Update --- */
         .editor-pane.shine-effect::after {
           content: '';
           position: absolute;
@@ -147,10 +148,10 @@
           background: linear-gradient(
             to right,
             rgba(255, 255, 255, 0) 0%,
-            rgba(255, 255, 255, 0.15) 50%,
+            rgba(255, 255, 255, 0.15) 50%, /* Made brighter */
             rgba(255, 255, 255, 0) 100%
           );
-          animation: shine-effect 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+          animation: shine-effect 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Made slower */
           pointer-events: none;
         }
 
@@ -226,21 +227,6 @@
             overflow: hidden;
         }
         
-        /* --- Aurora Canvas Style --- */
-        #auroraCanvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-            opacity: 0;
-            transition: opacity 0.5s ease;
-        }
-        #auroraCanvas.is-visible {
-            opacity: 1;
-        }
-        
         #dynamicContentWrapper {
             position: relative;
             width: 100%;
@@ -249,7 +235,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            z-index: 1; /* Ensure content is above aurora */
         }
         .hidable {
             transition: opacity 0.4s ease, transform 0.4s ease;
@@ -277,7 +262,6 @@
             gap: 10px;
             width: 100%;
             max-width: 350px;
-            z-index: 1;
         }
 
         .mic-select {
@@ -302,7 +286,6 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            z-index: 1;
         }
 
         #recordButton, #cancelButton {
@@ -515,7 +498,6 @@
 
         <footer>
             <div class="recording-interface">
-                <canvas id="auroraCanvas"></canvas>
                 <div id="dynamicContentWrapper">
                     <div class="status-indicator hidable" id="recordingStatus">Ready to record</div>
                     <div class="progress-indicator hidable is-hidden" id="progressIndicator">
@@ -557,90 +539,6 @@
         
         const GEMINI_API_KEY = "AIzaSyBxTxlsEWktNIIwBORKaGJwvOue45lRjMk"; // PASTE YOUR GEMINI API KEY HERE
         const MODEL_NAME = "gemini-1.5-flash";
-        
-        // --- Aurora Effect Class ---
-        class AuroraEffect {
-            constructor(canvas) {
-                this.canvas = canvas;
-                this.ctx = canvas.getContext('2d');
-                this.particles = [];
-                this.animationFrameId = null;
-                this.resizeObserver = new ResizeObserver(() => this.handleResize());
-                this.resizeObserver.observe(this.canvas);
-                this.handleResize();
-            }
-
-            handleResize() {
-                const dpr = window.devicePixelRatio || 1;
-                const rect = this.canvas.getBoundingClientRect();
-                this.canvas.width = rect.width * dpr;
-                this.canvas.height = rect.height * dpr;
-                this.ctx.scale(dpr, dpr);
-                this.particles = [];
-                this.createParticles();
-            }
-
-            createParticles() {
-                const { width, height } = this.canvas.getBoundingClientRect();
-                const colors = ['rgba(52, 199, 89, 0.1)', 'rgba(0, 122, 255, 0.1)', 'rgba(88, 86, 214, 0.1)'];
-                for (let i = 0; i < 3; i++) {
-                    this.particles.push({
-                        x: Math.random() * width,
-                        y: Math.random() * height,
-                        vx: (Math.random() - 0.5) * 0.3,
-                        vy: (Math.random() - 0.5) * 0.3,
-                        radius: Math.random() * 150 + 150,
-                        color: colors[i]
-                    });
-                }
-            }
-
-            animate() {
-                const { width, height } = this.canvas.getBoundingClientRect();
-                this.ctx.clearRect(0, 0, width, height);
-
-                this.particles.forEach(p => {
-                    p.x += p.vx;
-                    p.y += p.vy;
-
-                    if (p.x - p.radius > width) p.x = -p.radius;
-                    if (p.x + p.radius < 0) p.x = width + p.radius;
-                    if (p.y - p.radius > height) p.y = -p.radius;
-                    if (p.y + p.radius < 0) p.y = height + p.radius;
-                    
-                    const grad = this.ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius);
-                    grad.addColorStop(0, p.color);
-                    grad.addColorStop(1, 'rgba(0,0,0,0)');
-                    
-                    this.ctx.fillStyle = grad;
-                    this.ctx.beginPath();
-                    this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-                    this.ctx.fill();
-                });
-
-                this.animationFrameId = requestAnimationFrame(() => this.animate());
-            }
-
-            start() {
-                this.canvas.classList.add('is-visible');
-                if (!this.animationFrameId) {
-                    this.animate();
-                }
-            }
-
-            stop() {
-                this.canvas.classList.remove('is-visible');
-                if (this.animationFrameId) {
-                    cancelAnimationFrame(this.animationFrameId);
-                    this.animationFrameId = null;
-                }
-            }
-            
-            destroy() {
-                this.stop();
-                this.resizeObserver.disconnect();
-            }
-        }
 
         class VoiceNotesApp {
             constructor() {
@@ -664,7 +562,6 @@
                 this.maxVolumeDuringRecording = 0;
 
                 this.bindElements();
-                this.auroraEffect = new AuroraEffect(this.auroraCanvas);
                 this.bindEventListeners();
                 this.initTheme();
                 this.createNewNote();
@@ -698,7 +595,6 @@
                 this.liveWaveformCanvas = document.getElementById('liveWaveformCanvas');
                 this.liveWaveformCtx = this.liveWaveformCanvas.getContext('2d');
                 this.liveRecordingTimerDisplay = document.getElementById('liveRecordingTimerDisplay');
-                this.auroraCanvas = document.getElementById('auroraCanvas');
             }
 
             bindEventListeners() {
@@ -845,7 +741,6 @@
                 this.liveDisplayWrapper.classList.remove('is-hidden');
                 this.recordingStatus.classList.add('is-hidden');
                 this.buttonWrapper.classList.add('is-recording');
-                this.auroraEffect.start();
                 
                 this.setupCanvasDimensions();
                 this.recordButton.querySelector('i').classList.replace('fa-microphone', 'fa-stop');
@@ -866,7 +761,6 @@
                 this.liveDisplayWrapper.classList.add('is-hidden');
                 this.recordingStatus.classList.remove('is-hidden');
                 this.buttonWrapper.classList.remove('is-recording');
-                this.auroraEffect.stop();
                 
                 this.recordButton.querySelector('i').classList.replace('fa-stop', 'fa-microphone');
                 
