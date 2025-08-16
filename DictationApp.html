@@ -159,7 +159,29 @@
 
         #liveRecordingTitle { font-weight: bold; font-size: 1.1em; display: none; }
         #liveRecordingTimerDisplay { font-family: monospace; font-size: 1.2em; display: none; }
-        #liveWaveformCanvas { width: 100%; height: 60px; display: none; }
+        #liveWaveformCanvas { width: 100%; height: 60px; display: none; margin-bottom: 15px; }
+
+        .mic-selector-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            max-width: 350px;
+        }
+
+        .mic-select {
+            width: 100%;
+            background-color: var(--ui-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px;
+            font-size: 0.9em;
+        }
+        .mic-select:focus {
+            outline: 2px solid var(--color-recording);
+            border-color: var(--color-recording);
+        }
 
         #recordButton {
             width: 70px;
@@ -172,6 +194,7 @@
             justify-content: center;
             align-items: center;
             transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 15px;
         }
         #recordButton:hover { transform: scale(1.05); }
         .record-button-inner {
@@ -231,6 +254,12 @@
                 <div id="liveRecordingTitle"></div>
                 <canvas id="liveWaveformCanvas"></canvas>
                 <div id="liveRecordingTimerDisplay">00:00.00</div>
+                
+                <div class="mic-selector-wrapper">
+                    <i class="fa-solid fa-microphone-lines"></i>
+                    <select id="micSelect" class="mic-select" title="Select Microphone"></select>
+                </div>
+
                 <button id="recordButton" title="Start Recording">
                     <div class="record-button-inner">
                         <i class="fa-solid fa-microphone"></i>
@@ -287,6 +316,7 @@
                 this.editorTitle = document.getElementById('editorTitle');
                 this.copyRawButton = document.getElementById('copyRawButton');
                 this.copyPolishedButton = document.getElementById('copyPolishedButton');
+                this.micSelect = document.getElementById('micSelect');
 
                 this.recordingInterface = document.querySelector('.recording-interface');
                 this.liveRecordingTitle = document.getElementById('liveRecordingTitle');
@@ -300,13 +330,70 @@
                 this.createNewNote();
             }
 
+            async init() {
+                try {
+                    // Request permission on load to get device labels
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    // We don't need to keep the stream running, so stop it immediately.
+                    stream.getTracks().forEach(track => track.stop());
+                    // Now that we have permission, populate the list with full device labels.
+                    await this.populateMicList();
+                } catch (error) {
+                    console.error("Error getting microphone permission on load:", error);
+                    this.recordingStatus.textContent = "Mic permission needed. Please allow and reload.";
+                    // Still try to populate the list; it might show an error or default devices.
+                    await this.populateMicList();
+                }
+            }
+
             bindEventListeners() {
                 this.recordButton.addEventListener('click', () => this.toggleRecording());
                 this.newButton.addEventListener('click', () => this.createNewNote());
                 this.themeToggleButton.addEventListener('click', () => this.toggleTheme());
                 this.copyRawButton.addEventListener('click', () => this.copyToClipboard('rawTranscription', this.copyRawButton));
                 this.copyPolishedButton.addEventListener('click', () => this.copyToClipboard('polishedNote', this.copyPolishedButton));
+                
+                this.micSelect.addEventListener('change', () => {
+                    localStorage.setItem('selectedMicId', this.micSelect.value);
+                });
+                navigator.mediaDevices.addEventListener('devicechange', () => this.populateMicList());
+                
                 window.addEventListener('resize', this.handleResize.bind(this));
+            }
+
+            async populateMicList() {
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const audioInputs = devices.filter(device => device.kind === 'audioinput');
+                    
+                    const currentMicValue = this.micSelect.value;
+                    this.micSelect.innerHTML = ''; // Clear existing options
+                    
+                    if (audioInputs.length === 0) {
+                        this.micSelect.innerHTML = '<option>No microphones found</option>';
+                        return;
+                    }
+
+                    const savedMicId = localStorage.getItem('selectedMicId');
+
+                    audioInputs.forEach(device => {
+                        const option = document.createElement('option');
+                        option.value = device.deviceId;
+                        option.textContent = device.label || `Microphone ${this.micSelect.length + 1}`;
+                        this.micSelect.appendChild(option);
+                    });
+                    
+                    // Try to re-select the previously saved or current mic
+                    if (savedMicId && audioInputs.some(d => d.deviceId === savedMicId)) {
+                        this.micSelect.value = savedMicId;
+                    } else if (currentMicValue && audioInputs.some(d => d.deviceId === currentMicValue)) {
+                        this.micSelect.value = currentMicValue;
+                    }
+
+                } catch (error) {
+                    console.error("Error populating microphone list:", error);
+                    this.micSelect.innerHTML = '<option>Could not access mics</option>';
+                }
             }
 
             handleResize() {
@@ -469,7 +556,15 @@
                     this.audioChunks = [];
                     this.maxVolumeDuringRecording = 0;
                     this.recordingStatus.textContent = 'Requesting mic access...';
-                    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    
+                    const selectedMicId = this.micSelect.value;
+                    const constraints = {
+                        audio: {
+                            deviceId: selectedMicId ? { exact: selectedMicId } : undefined
+                        }
+                    };
+
+                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
                     
                     this.mediaRecorder = new MediaRecorder(this.stream);
                     
@@ -502,6 +597,7 @@
                     this.isRecording = true;
                     this.recordButton.classList.add('recording');
                     this.recordButton.setAttribute('title', 'Stop Recording');
+                    this.micSelect.disabled = true; // Disable selector during recording
                     this.startLiveDisplay();
 
                 } catch (error) {
@@ -519,6 +615,7 @@
                     this.isRecording = false;
                     this.recordButton.classList.remove('recording');
                     this.recordButton.setAttribute('title', 'Start Recording');
+                    this.micSelect.disabled = false; // Re-enable selector
                     this.recordingStatus.textContent = 'Processing audio...';
                 }
             }
@@ -642,10 +739,9 @@
 
                 const textToCopy = element.innerText;
                 
-                // Use a temporary textarea to preserve formatting
                 const textArea = document.createElement('textarea');
                 textArea.value = textToCopy;
-                textArea.style.position = 'fixed'; // Prevent scrolling to bottom of page in MS Edge.
+                textArea.style.position = 'fixed';
                 textArea.style.top = '0';
                 textArea.style.left = '0';
                 textArea.style.opacity = '0';
@@ -656,7 +752,6 @@
                 try {
                     document.execCommand('copy');
                     
-                    // Visual feedback
                     const icon = buttonElement.querySelector('i');
                     icon.classList.replace('fa-copy', 'fa-check');
                     setTimeout(() => {
@@ -715,8 +810,9 @@
             });
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            new VoiceNotesApp();
+        document.addEventListener('DOMContentLoaded', async () => {
+            const app = new VoiceNotesApp();
+            await app.init(); // Initialize and ask for permission
             setupPlaceholders();
         });
     </script>
