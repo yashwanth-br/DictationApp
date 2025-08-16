@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Voice Notes</title>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    
+    <style>
+        :root {
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            --bg-color: #1c1c1e;
+            --text-color: #f2f2f7;
+            --text-secondary-color: #8e8e93;
+            --ui-color: #2c2c2e;
+            --border-color: #3a3a3c;
+            --color-recording: #ff3b30;
+            --color-placeholder: #6a6a6e;
+        }
+
+        body.light-mode {
+            --bg-color: #f2f2f7;
+            --text-color: #1c1c1e;
+            --text-secondary-color: #6a6a6e;
+            --ui-color: #ffffff;
+            --border-color: #d1d1d6;
+            --color-placeholder: #b0b0b5;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: var(--ui-color);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .editor-title {
+            font-size: 1.5em;
+            font-weight: 600;
+            outline: none;
+        }
+
+        .header-actions button {
+            background: none;
+            border: none;
+            color: var(--text-secondary-color);
+            cursor: pointer;
+            font-size: 1.2em;
+            padding: 8px;
+            border-radius: 8px;
+        }
+        .header-actions button:hover {
+            background-color: var(--border-color);
+            color: var(--text-color);
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .editor-pane {
+            background-color: var(--ui-color);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .editor-pane-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .editor-pane-header h3 {
+            margin: 0;
+            color: var(--text-secondary-color);
+            font-weight: 500;
+        }
+
+        .copy-button {
+            background: none;
+            border: none;
+            color: var(--text-secondary-color);
+            cursor: pointer;
+            font-size: 1em;
+            padding: 5px;
+        }
+        .copy-button:hover {
+            color: var(--text-color);
+        }
+
+        .editor-content {
+            flex-grow: 1;
+            outline: none;
+            line-height: 1.6;
+            min-height: 300px;
+        }
+        
+        #polishedNote p { margin-top: 0; }
+        #polishedNote h1, #polishedNote h2 { margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; }
+        #polishedNote ul, #polishedNote ol { padding-left: 20px; }
+        #polishedNote code { background-color: var(--border-color); padding: 2px 5px; border-radius: 4px; }
+        #polishedNote blockquote { border-left: 3px solid var(--border-color); padding-left: 10px; color: var(--text-secondary-color); margin-left: 0; }
+
+
+        .placeholder-active {
+            color: var(--color-placeholder);
+            font-style: italic;
+        }
+
+        footer {
+            text-align: center;
+        }
+
+        .recording-interface {
+            position: relative;
+            background-color: var(--ui-color);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .status-indicator, #liveRecordingTitle, #liveRecordingTimerDisplay {
+            color: var(--text-secondary-color);
+            font-size: 0.9em;
+        }
+
+        #liveRecordingTitle { font-weight: bold; font-size: 1.1em; display: none; }
+        #liveRecordingTimerDisplay { font-family: monospace; font-size: 1.2em; display: none; }
+        #liveWaveformCanvas { width: 100%; height: 60px; display: none; }
+
+        #recordButton {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: none;
+            background-color: var(--color-recording);
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        #recordButton:hover { transform: scale(1.05); }
+        .record-button-inner {
+            width: 60px;
+            height: 60px;
+            background-color: var(--bg-color);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .record-button-inner i { color: var(--color-recording); font-size: 24px; }
+        
+        #recordButton.recording .record-button-inner i.fa-stop {
+            border-radius: 4px; /* Makes the stop icon a square */
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <div id="editorTitle" class="editor-title" contenteditable="true" placeholder="Untitled Note"></div>
+            <div class="header-actions">
+                <button id="newButton" title="New Note"><i class="fa-solid fa-file-circle-plus"></i></button>
+                <button id="themeToggleButton" title="Toggle Theme"><i class="fa-solid fa-sun"></i></button>
+            </div>
+        </header>
+
+        <main>
+            <div class="editor-pane">
+                <div class="editor-pane-header">
+                    <h3>Raw Transcription</h3>
+                    <button id="copyRawButton" class="copy-button" title="Copy to Clipboard"><i class="fa-solid fa-copy"></i></button>
+                </div>
+                <div id="rawTranscription" class="editor-content" contenteditable="true" placeholder="Your raw, unedited transcription will appear here after recording..."></div>
+            </div>
+            <div class="editor-pane">
+                <div class="editor-pane-header">
+                    <h3>Polished Note</h3>
+                    <button id="copyPolishedButton" class="copy-button" title="Copy to Clipboard"><i class="fa-solid fa-copy"></i></button>
+                </div>
+                <div id="polishedNote" class="editor-content" contenteditable="true" placeholder="The polished, AI-formatted note will appear here..."></div>
+            </div>
+        </main>
+
+        <footer>
+            <div class="recording-interface">
+                <div class="status-indicator" id="recordingStatus">Ready to record</div>
+                <div id="liveRecordingTitle"></div>
+                <canvas id="liveWaveformCanvas"></canvas>
+                <div id="liveRecordingTimerDisplay">00:00.00</div>
+                <button id="recordButton" title="Start Recording">
+                    <div class="record-button-inner">
+                        <i class="fa-solid fa-microphone"></i>
+                    </div>
+                </button>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- Load required libraries from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <script type="module">
+        // Import the Google AI SDK from the CDN
+        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+        
+        // PASTE YOUR GEMINI API KEY HERE
+        const GEMINI_API_KEY = "AIzaSyBxTxlsEWktNIIwBORKaGJwvOue45lRjMk";
+        
+        const MODEL_NAME = "gemini-2.5-pro";
+
+        class VoiceNotesApp {
+            constructor() {
+                if (!GEMINI_API_KEY || GEMINI_API_KEY === "YOUR_API_KEY_HERE") {
+                    alert("Please set your GEMINI_API_KEY in the script tag.");
+                    return;
+                }
+                
+                this.genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+
+                this.mediaRecorder = null;
+                this.audioChunks = [];
+                this.isRecording = false;
+                this.currentNote = null;
+                this.stream = null;
+                
+                // Audio visualization properties
+                this.audioContext = null;
+                this.analyserNode = null;
+                this.waveformDataArray = null;
+                this.waveformDrawingId = null;
+                this.timerIntervalId = null;
+                this.recordingStartTime = 0;
+                this.maxVolumeDuringRecording = 0;
+
+                // Bind HTML Elements
+                this.recordButton = document.getElementById('recordButton');
+                this.recordingStatus = document.getElementById('recordingStatus');
+                this.rawTranscription = document.getElementById('rawTranscription');
+                this.polishedNote = document.getElementById('polishedNote');
+                this.newButton = document.getElementById('newButton');
+                this.themeToggleButton = document.getElementById('themeToggleButton');
+                this.themeToggleIcon = this.themeToggleButton.querySelector('i');
+                this.editorTitle = document.getElementById('editorTitle');
+                this.copyRawButton = document.getElementById('copyRawButton');
+                this.copyPolishedButton = document.getElementById('copyPolishedButton');
+
+                this.recordingInterface = document.querySelector('.recording-interface');
+                this.liveRecordingTitle = document.getElementById('liveRecordingTitle');
+                this.liveWaveformCanvas = document.getElementById('liveWaveformCanvas');
+                this.liveWaveformCtx = this.liveWaveformCanvas.getContext('2d');
+                this.liveRecordingTimerDisplay = document.getElementById('liveRecordingTimerDisplay');
+                this.statusIndicatorDiv = this.recordingInterface.querySelector('.status-indicator');
+
+                this.bindEventListeners();
+                this.initTheme();
+                this.createNewNote();
+            }
+
+            bindEventListeners() {
+                this.recordButton.addEventListener('click', () => this.toggleRecording());
+                this.newButton.addEventListener('click', () => this.createNewNote());
+                this.themeToggleButton.addEventListener('click', () => this.toggleTheme());
+                this.copyRawButton.addEventListener('click', () => this.copyToClipboard('rawTranscription', this.copyRawButton));
+                this.copyPolishedButton.addEventListener('click', () => this.copyToClipboard('polishedNote', this.copyPolishedButton));
+                window.addEventListener('resize', this.handleResize.bind(this));
+            }
+
+            handleResize() {
+                if (this.isRecording && this.liveWaveformCanvas && this.liveWaveformCanvas.style.display === 'block') {
+                    requestAnimationFrame(() => {
+                        this.setupCanvasDimensions();
+                    });
+                }
+            }
+            
+            setupCanvasDimensions() {
+                if (!this.liveWaveformCanvas || !this.liveWaveformCtx) return;
+                const canvas = this.liveWaveformCanvas;
+                const dpr = window.devicePixelRatio || 1;
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                this.liveWaveformCtx.scale(dpr, dpr);
+            }
+
+            initTheme() {
+                if (localStorage.getItem('theme') === 'light') {
+                    document.body.classList.add('light-mode');
+                    this.themeToggleIcon.classList.replace('fa-sun', 'fa-moon');
+                } else {
+                    document.body.classList.remove('light-mode');
+                    this.themeToggleIcon.classList.replace('fa-moon', 'fa-sun');
+                }
+            }
+
+            toggleTheme() {
+                document.body.classList.toggle('light-mode');
+                if (document.body.classList.contains('light-mode')) {
+                    localStorage.setItem('theme', 'light');
+                    this.themeToggleIcon.classList.replace('fa-sun', 'fa-moon');
+                } else {
+                    localStorage.setItem('theme', 'dark');
+                    this.themeToggleIcon.classList.replace('fa-moon', 'fa-sun');
+                }
+            }
+
+            async toggleRecording() {
+                if (!this.isRecording) {
+                    await this.startRecording();
+                } else {
+                    await this.stopRecording();
+                }
+            }
+            
+            setupAudioVisualizer() {
+                if (!this.stream || this.audioContext) return;
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = this.audioContext.createMediaStreamSource(this.stream);
+                this.analyserNode = this.audioContext.createAnalyser();
+                this.analyserNode.fftSize = 256;
+                this.analyserNode.smoothingTimeConstant = 0.5;
+                const bufferLength = this.analyserNode.frequencyBinCount;
+                this.waveformDataArray = new Uint8Array(bufferLength);
+                source.connect(this.analyserNode);
+            }
+
+            drawLiveWaveform() {
+                if (!this.analyserNode || !this.waveformDataArray || !this.liveWaveformCtx || !this.isRecording) {
+                    if (this.waveformDrawingId) cancelAnimationFrame(this.waveformDrawingId);
+                    this.waveformDrawingId = null;
+                    return;
+                }
+
+                this.waveformDrawingId = requestAnimationFrame(() => this.drawLiveWaveform());
+                
+                this.analyserNode.getByteFrequencyData(this.waveformDataArray);
+
+                const ctx = this.liveWaveformCtx;
+                const canvas = this.liveWaveformCanvas;
+                const { width, height } = canvas.getBoundingClientRect();
+                
+                ctx.clearRect(0, 0, width, height);
+                
+                const barCount = this.waveformDataArray.length * 0.7;
+                const barWidth = width / barCount / 1.5;
+                const barSpacing = barWidth * 0.5;
+                let x = 0;
+
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-recording').trim();
+                
+                let currentMaxVolume = 0;
+                for (let i = 0; i < barCount; i++) {
+                    const barHeight = (this.waveformDataArray[i] / 255) * height;
+                    if (this.waveformDataArray[i] > currentMaxVolume) {
+                        currentMaxVolume = this.waveformDataArray[i];
+                    }
+                    const y = height - barHeight;
+                    ctx.fillRect(x, y, barWidth, barHeight);
+                    x += barWidth + barSpacing;
+                }
+                
+                if (currentMaxVolume > this.maxVolumeDuringRecording) {
+                    this.maxVolumeDuringRecording = currentMaxVolume;
+                }
+            }
+            
+            updateLiveTimer() {
+                if (!this.isRecording) return;
+                const elapsedMs = Date.now() - this.recordingStartTime;
+                const totalSeconds = Math.floor(elapsedMs / 1000);
+                const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+                const seconds = String(totalSeconds % 60).padStart(2, '0');
+                const hundredths = String(Math.floor((elapsedMs % 1000) / 10)).padStart(2, '0');
+                this.liveRecordingTimerDisplay.textContent = `${minutes}:${seconds}.${hundredths}`;
+            }
+
+            startLiveDisplay() {
+                this.recordingInterface.classList.add('is-live');
+                this.liveRecordingTitle.style.display = 'block';
+                this.liveWaveformCanvas.style.display = 'block';
+                this.liveRecordingTimerDisplay.style.display = 'block';
+                this.statusIndicatorDiv.style.display = 'none';
+
+                this.setupCanvasDimensions();
+                
+                const iconElement = this.recordButton.querySelector('i');
+                iconElement.classList.replace('fa-microphone', 'fa-stop');
+                
+                const currentTitle = this.editorTitle.textContent.trim();
+                const placeholder = this.editorTitle.getAttribute('placeholder');
+                this.liveRecordingTitle.textContent = (currentTitle && currentTitle !== placeholder) ? currentTitle : 'New Recording';
+
+                this.setupAudioVisualizer();
+                this.drawLiveWaveform();
+
+                this.recordingStartTime = Date.now();
+                this.updateLiveTimer();
+                this.timerIntervalId = setInterval(() => this.updateLiveTimer(), 50);
+            }
+
+            stopLiveDisplay() {
+                this.recordingInterface.classList.remove('is-live');
+                this.liveRecordingTitle.style.display = 'none';
+                this.liveWaveformCanvas.style.display = 'none';
+                this.liveRecordingTimerDisplay.style.display = 'none';
+                this.statusIndicatorDiv.style.display = 'block';
+                
+                const iconElement = this.recordButton.querySelector('i');
+                iconElement.classList.replace('fa-stop', 'fa-microphone');
+                
+                if (this.waveformDrawingId) cancelAnimationFrame(this.waveformDrawingId);
+                if (this.timerIntervalId) clearInterval(this.timerIntervalId);
+                
+                this.waveformDrawingId = null;
+                this.timerIntervalId = null;
+
+                if (this.audioContext && this.audioContext.state !== 'closed') {
+                    this.audioContext.close();
+                }
+                this.audioContext = null;
+            }
+
+            async startRecording() {
+                try {
+                    this.audioChunks = [];
+                    this.maxVolumeDuringRecording = 0;
+                    this.recordingStatus.textContent = 'Requesting mic access...';
+                    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    
+                    this.mediaRecorder = new MediaRecorder(this.stream);
+                    
+                    this.mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) this.audioChunks.push(event.data);
+                    };
+
+                    this.mediaRecorder.onstop = () => {
+                        this.stopLiveDisplay();
+                        
+                        const SILENCE_THRESHOLD = 10;
+                        if (this.maxVolumeDuringRecording < SILENCE_THRESHOLD) {
+                            this.recordingStatus.textContent = 'Recording was silent. Check mic volume.';
+                            this.rawTranscription.textContent = 'Recording appears to be silent. Please check your system microphone settings and ensure your mic is not muted.';
+                            this.rawTranscription.classList.add('placeholder-active');
+                            if (this.stream) this.stream.getTracks().forEach(track => track.stop());
+                            this.stream = null;
+                            return;
+                        }
+
+                        if (this.audioChunks.length > 0) {
+                            const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                            this.processAudio(audioBlob);
+                        }
+                        if (this.stream) this.stream.getTracks().forEach(track => track.stop());
+                        this.stream = null;
+                    };
+
+                    this.mediaRecorder.start();
+                    this.isRecording = true;
+                    this.recordButton.classList.add('recording');
+                    this.recordButton.setAttribute('title', 'Stop Recording');
+                    this.startLiveDisplay();
+
+                } catch (error) {
+                    console.error("Error starting recording:", error);
+                    this.recordingStatus.textContent = `Error: Could not start recording. ${error.message}`;
+                    this.isRecording = false;
+                    this.recordButton.classList.remove('recording');
+                    this.stopLiveDisplay();
+                }
+            }
+
+            async stopRecording() {
+                if (this.mediaRecorder && this.isRecording) {
+                    this.mediaRecorder.stop();
+                    this.isRecording = false;
+                    this.recordButton.classList.remove('recording');
+                    this.recordButton.setAttribute('title', 'Start Recording');
+                    this.recordingStatus.textContent = 'Processing audio...';
+                }
+            }
+            
+            async fileToGenerativePart(blob, mimeType) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const base64Data = reader.result.split(',')[1];
+                        resolve({
+                            inlineData: {
+                                data: base64Data,
+                                mimeType
+                            }
+                        });
+                    };
+                    reader.onerror = (err) => reject(err);
+                    reader.readAsDataURL(blob);
+                });
+            }
+
+            async processAudio(audioBlob) {
+                if (audioBlob.size === 0) {
+                    this.recordingStatus.textContent = 'No audio captured. Try again.';
+                    return;
+                }
+                
+                try {
+                    this.recordingStatus.textContent = 'Transcribing audio...';
+                    
+                    const model = this.genAI.getGenerativeModel({ model: MODEL_NAME });
+                    const audioPart = await this.fileToGenerativePart(audioBlob, audioBlob.type);
+                    
+                    const prompt = "Transcribe the spoken words in this audio recording. If there is no clear speech, respond with the single phrase: '[NO SPEECH DETECTED]'. Do not describe background noises.";
+                    const result = await model.generateContent([prompt, audioPart]);
+                    const response = await result.response;
+                    let transcriptionText = response.text();
+
+                    if (transcriptionText && !transcriptionText.includes('[NO SPEECH DETECTED]')) {
+                        this.rawTranscription.textContent = transcriptionText;
+                        this.rawTranscription.classList.remove('placeholder-active');
+                        this.recordingStatus.textContent = 'Polishing note...';
+                        await this.getPolishedNote(transcriptionText);
+                    } else {
+                        throw new Error("No speech was detected in the audio.");
+                    }
+
+                } catch (error) {
+                    console.error("Error in processAudio:", error);
+                    this.recordingStatus.textContent = error.message;
+                    this.rawTranscription.textContent = 'Could not detect speech. Please try recording again in a quieter environment.';
+                    this.rawTranscription.classList.add('placeholder-active');
+                }
+            }
+
+            async getPolishedNote(rawText) {
+                if (!rawText.trim()) {
+                    this.recordingStatus.textContent = 'No text to polish.';
+                    return;
+                }
+
+                try {
+                    const model = this.genAI.getGenerativeModel({ model: MODEL_NAME });
+                    const prompt = `
+                        Take the following raw transcription and turn it into a polished, well-formatted note.
+                        - Correct any spelling or grammatical errors.
+                        - Remove filler words (like "um", "uh", "you know") and false starts.
+                        - Structure the content logically with paragraphs.
+                        - Use markdown for formatting: use headings (#, ##), bullet points (*), and bold text (**) where appropriate to enhance readability.
+                        - Ensure the core meaning and all important information from the original transcription are preserved.
+                        - IMPORTANT: Do not include any conversational preamble or introductory text like "Of course, here is...". Only return the formatted note content itself.
+
+                        Raw Transcription:
+                        ---
+                        ${rawText}
+                    `;
+
+                    const result = await model.generateContent(prompt);
+                    const response = await result.response;
+                    const polishedText = response.text();
+
+                    if ( polishedText ) {
+                        this.polishedNote.innerHTML = marked.parse(polishedText);
+                        this.polishedNote.classList.remove('placeholder-active');
+                        this.setNoteTitle(polishedText);
+                        this.recordingStatus.textContent = 'Note polished! Ready to record.';
+                    } else {
+                        throw new Error("Polishing returned empty.");
+                    }
+                } catch (error) {
+                    console.error("Error polishing note:", error);
+                    this.recordingStatus.textContent = 'Error during polishing.';
+                    this.polishedNote.innerHTML = `<p><em>Polishing failed. Raw transcript is available.</em></p>`;
+                }
+            }
+            
+            setNoteTitle(polishedText) {
+                const lines = polishedText.split('\n');
+                let title = '';
+                
+                const h1 = lines.find(line => line.startsWith('# '));
+                if (h1) {
+                    title = h1.replace('# ', '').trim();
+                } else {
+                    const firstLine = lines.find(line => line.trim().length > 3);
+                    if (firstLine) {
+                        title = firstLine.replace(/[\*\_#]/g, '').trim().substring(0, 60);
+                        if (firstLine.length > 60) title += '...';
+                    }
+                }
+
+                if (title) {
+                    this.editorTitle.textContent = title;
+                    this.editorTitle.classList.remove('placeholder-active');
+                }
+            }
+
+            copyToClipboard(elementId, buttonElement) {
+                const element = document.getElementById(elementId);
+                if (!element || element.classList.contains('placeholder-active')) return;
+
+                const textToCopy = element.innerText;
+                
+                // Use a temporary textarea to preserve formatting
+                const textArea = document.createElement('textarea');
+                textArea.value = textToCopy;
+                textArea.style.position = 'fixed'; // Prevent scrolling to bottom of page in MS Edge.
+                textArea.style.top = '0';
+                textArea.style.left = '0';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+
+                try {
+                    document.execCommand('copy');
+                    
+                    // Visual feedback
+                    const icon = buttonElement.querySelector('i');
+                    icon.classList.replace('fa-copy', 'fa-check');
+                    setTimeout(() => {
+                        icon.classList.replace('fa-check', 'fa-copy');
+                    }, 1500);
+
+                } catch (err) {
+                    console.error('Fallback: Oops, unable to copy', err);
+                }
+
+                document.body.removeChild(textArea);
+            }
+
+            createNewNote() {
+                this.currentNote = { id: `note_${Date.now()}` };
+                
+                ['rawTranscription', 'polishedNote', 'editorTitle'].forEach(id => {
+                    const el = document.getElementById(id);
+                    const placeholder = el.getAttribute('placeholder') || '';
+                    if (id === 'polishedNote') el.innerHTML = placeholder;
+                    else el.textContent = placeholder;
+                    el.classList.add('placeholder-active');
+                });
+
+                this.recordingStatus.textContent = 'Ready to record';
+                if (this.isRecording) this.stopRecording();
+            }
+        }
+        
+        function setupPlaceholders() {
+             document.querySelectorAll('[contenteditable][placeholder]').forEach(el => {
+                const placeholder = el.getAttribute('placeholder');
+
+                function updatePlaceholderState() {
+                    const text = (el.id === 'polishedNote' ? el.innerText : el.textContent).trim();
+                    if (text === '' || text === placeholder) {
+                        if (el.id === 'polishedNote' && text === '') el.innerHTML = placeholder;
+                        else if (text === '') el.textContent = placeholder;
+                        el.classList.add('placeholder-active');
+                    } else {
+                        el.classList.remove('placeholder-active');
+                    }
+                }
+
+                updatePlaceholderState();
+
+                el.addEventListener('focus', function () {
+                    if (this.classList.contains('placeholder-active')) {
+                        if (this.id === 'polishedNote') this.innerHTML = '';
+                        else this.textContent = '';
+                        this.classList.remove('placeholder-active');
+                    }
+                });
+                
+                el.addEventListener('blur', updatePlaceholderState);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new VoiceNotesApp();
+            setupPlaceholders();
+        });
+    </script>
+
+</body>
+</html>
