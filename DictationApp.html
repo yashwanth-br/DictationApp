@@ -18,6 +18,7 @@
             --color-recording: #ff3b30;
             --color-placeholder: #6a6a6e;
             --color-cancel: #5856d6;
+            --color-success: #34c759;
         }
 
         body.light-mode {
@@ -238,6 +239,61 @@
             color: white;
         }
 
+        .progress-indicator {
+            display: none; /* Hidden by default */
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+            color: var(--text-secondary-color);
+        }
+        .progress-step {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: color 0.3s;
+        }
+        .progress-step.active {
+            color: var(--text-color);
+            font-weight: 600;
+        }
+        .progress-step.completed {
+            color: var(--color-success);
+        }
+
+        .dot-container {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--border-color);
+            border-radius: 50%;
+            transition: background-color 0.3s;
+        }
+        .progress-step.active .dot {
+            background-color: var(--color-recording);
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+        .checkmark {
+            display: none;
+            color: var(--color-success);
+        }
+        .progress-step.completed .dot {
+            display: none;
+        }
+        .progress-step.completed .checkmark {
+            display: inline-block;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.4); opacity: 0.7; }
+        }
+
         /* Responsive Design */
         @media (max-width: 992px) { /* Adjusted for 3 columns */
             main {
@@ -284,6 +340,31 @@
         <footer>
             <div class="recording-interface">
                 <div class="status-indicator" id="recordingStatus">Ready to record</div>
+                <div class="progress-indicator" id="progressIndicator">
+                    <div class="progress-step" id="step1">
+                        <div class="dot-container">
+                            <div class="dot"></div>
+                            <i class="fa-solid fa-check checkmark"></i>
+                        </div> 
+                        <span class="label">Transcribing</span>
+                    </div>
+                    <i class="fa-solid fa-arrow-right-long"></i>
+                    <div class="progress-step" id="step2">
+                        <div class="dot-container">
+                            <div class="dot"></div>
+                            <i class="fa-solid fa-check checkmark"></i>
+                        </div>
+                        <span class="label">Cleaning</span>
+                    </div>
+                    <i class="fa-solid fa-arrow-right-long"></i>
+                    <div class="progress-step" id="step3">
+                        <div class="dot-container">
+                            <div class="dot"></div>
+                            <i class="fa-solid fa-check checkmark"></i>
+                        </div>
+                        <span class="label">Polishing</span>
+                    </div>
+                </div>
                 <div id="liveRecordingTitle"></div>
                 <canvas id="liveWaveformCanvas"></canvas>
                 <div id="liveRecordingTimerDisplay">00:00.00</div>
@@ -348,6 +429,7 @@
                 this.recordButton = document.getElementById('recordButton');
                 this.cancelButton = document.getElementById('cancelButton');
                 this.recordingStatus = document.getElementById('recordingStatus');
+                this.progressIndicator = document.getElementById('progressIndicator');
                 this.rawTranscription = document.getElementById('rawTranscription');
                 this.cleanedTranscript = document.getElementById('cleanedTranscript');
                 this.polishedNote = document.getElementById('polishedNote');
@@ -726,6 +808,37 @@
                 });
             }
 
+            updateProgress(status) {
+                this.progressIndicator.style.display = 'flex';
+                this.statusIndicatorDiv.style.display = 'none';
+                
+                const steps = {
+                    step1: { el: document.getElementById('step1'), label: 'Transcribing', pastLabel: 'Transcribed' },
+                    step2: { el: document.getElementById('step2'), label: 'Cleaning', pastLabel: 'Cleaned' },
+                    step3: { el: document.getElementById('step3'), label: 'Polishing', pastLabel: 'Polished' }
+                };
+
+                Object.values(steps).forEach(step => {
+                    step.el.classList.remove('active', 'completed');
+                    step.el.querySelector('.label').textContent = step.label;
+                });
+
+                if (status.stage === 'transcribing') {
+                    steps.step1.el.classList.add('active');
+                } else if (status.stage === 'processing') {
+                    steps.step1.el.classList.add('completed');
+                    steps.step1.el.querySelector('.label').textContent = steps.step1.pastLabel;
+                    steps.step2.el.classList.add('active');
+                    steps.step3.el.classList.add('active');
+                } else if (status.stage === 'complete') {
+                    Object.values(steps).forEach(step => {
+                        step.el.classList.remove('active');
+                        step.el.classList.add('completed');
+                        step.el.querySelector('.label').textContent = step.pastLabel;
+                    });
+                }
+            }
+
             async processAudio(audioBlob) {
                 if (audioBlob.size === 0) {
                     this.recordingStatus.textContent = 'No audio captured. Try again.';
@@ -733,7 +846,7 @@
                 }
                 
                 try {
-                    this.recordingStatus.textContent = 'Transcribing audio...';
+                    this.updateProgress({ stage: 'transcribing' });
                     
                     const model = this.genAI.getGenerativeModel({ model: MODEL_NAME });
                     const audioPart = await this.fileToGenerativePart(audioBlob, audioBlob.type);
@@ -747,12 +860,20 @@
                         this.rawTranscription.textContent = transcriptionText;
                         this.rawTranscription.classList.remove('placeholder-active');
                         
-                        this.recordingStatus.textContent = 'Cleaning and polishing...';
+                        this.updateProgress({ stage: 'processing' });
+                        
                         await Promise.all([
                             this.getCleanedTranscript(transcriptionText),
                             this.getPolishedNote(transcriptionText)
                         ]);
+
+                        this.updateProgress({ stage: 'complete' });
+                        
                         this.recordingStatus.textContent = 'Note processed! Ready to record.';
+                        setTimeout(() => {
+                            this.progressIndicator.style.display = 'none';
+                            this.statusIndicatorDiv.style.display = 'block';
+                        }, 2000);
 
                     } else {
                         throw new Error("No speech was detected in the audio.");
@@ -763,6 +884,8 @@
                     this.recordingStatus.textContent = error.message;
                     this.rawTranscription.textContent = 'Could not detect speech. Please try recording again in a quieter environment.';
                     this.rawTranscription.classList.add('placeholder-active');
+                    this.progressIndicator.style.display = 'none';
+                    this.statusIndicatorDiv.style.display = 'block';
                 }
             }
 
@@ -893,6 +1016,8 @@
                 });
 
                 this.recordingStatus.textContent = 'Ready to record';
+                this.progressIndicator.style.display = 'none';
+                this.statusIndicatorDiv.style.display = 'block';
                 if (this.isRecording) this.stopRecording();
             }
         }
