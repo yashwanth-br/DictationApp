@@ -49,6 +49,15 @@
             80% { transform: scale(1.1); opacity: 1; }
             100% { transform: scale(1); }
         }
+        
+        @keyframes shine-effect {
+          0% {
+            transform: translate(-100%, 100%) rotate(45deg);
+          }
+          100% {
+            transform: translate(100%, -100%) rotate(45deg);
+          }
+        }
 
         body {
             font-family: var(--font-family);
@@ -120,11 +129,32 @@
             flex-direction: column;
             box-shadow: 0 4px 12px var(--shadow-color);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
         }
         .editor-pane:hover {
             transform: translateY(-5px);
             box-shadow: 0 8px 25px var(--shadow-color);
         }
+        
+        /* --- Shine Effect Update --- */
+        .editor-pane.shine-effect::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 200%;
+          height: 200%;
+          background: linear-gradient(
+            to right,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, 0.15) 50%, /* Made brighter */
+            rgba(255, 255, 255, 0) 100%
+          );
+          animation: shine-effect 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Made slower */
+          pointer-events: none;
+        }
+
 
         .editor-pane-header {
             display: flex;
@@ -175,11 +205,10 @@
             color: var(--color-placeholder);
             font-style: italic;
         }
-        /* --- Title Bar Style Update --- */
         #editorTitle.placeholder-active {
-            font-weight: 600; /* Changed from default */
-            font-style: normal; /* Changed from italic */
-            color: var(--text-secondary-color); /* A slightly stronger placeholder color */
+            font-weight: 600;
+            font-style: normal;
+            color: var(--text-secondary-color);
         }
 
 
@@ -275,7 +304,6 @@
             align-items: center;
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
             z-index: 2;
-            /* --- Split Animation Update --- */
             transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.2s;
         }
         #recordButton:hover { transform: scale(1.05); }
@@ -325,7 +353,6 @@
             opacity: 0;
             transform: scale(0.5);
             pointer-events: none;
-            /* --- Split Animation Update --- */
             transition: background-color 0.2s, color 0.2s, opacity 0.4s ease, transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         }
         
@@ -960,13 +987,26 @@
                 this.updateProgress('off');
                 if (this.isRecording) this.cancelRecording();
             }
-
+            
             async typeEffect(element, text, isMarkdown = false) {
                 element.classList.add('is-updating');
                 await new Promise(resolve => setTimeout(resolve, 400));
-                if (isMarkdown) element.innerHTML = marked.parse(text);
-                else element.textContent = text;
+                
+                if (isMarkdown) {
+                    element.innerHTML = marked.parse(text);
+                } else {
+                    element.textContent = text;
+                }
+
                 element.classList.remove('placeholder-active', 'is-updating');
+
+                const parentPane = element.closest('.editor-pane');
+                if (parentPane) {
+                    parentPane.classList.add('shine-effect');
+                    parentPane.addEventListener('animationend', () => {
+                        parentPane.classList.remove('shine-effect');
+                    }, { once: true });
+                }
             }
         }
         
