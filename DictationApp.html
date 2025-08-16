@@ -42,7 +42,7 @@
 
         .container {
             width: 100%;
-            max-width: 900px;
+            max-width: 1200px; /* Increased max-width for 3 columns */
             display: flex;
             flex-direction: column;
             gap: 20px;
@@ -80,7 +80,7 @@
 
         main {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(3, 1fr); /* Three columns */
             gap: 20px;
         }
 
@@ -239,7 +239,7 @@
         }
 
         /* Responsive Design */
-        @media (max-width: 768px) {
+        @media (max-width: 992px) { /* Adjusted for 3 columns */
             main {
                 grid-template-columns: 1fr;
             }
@@ -260,10 +260,17 @@
         <main>
             <div class="editor-pane">
                 <div class="editor-pane-header">
-                    <h3>Raw Transcription</h3>
+                    <h3>Raw Transcript</h3>
                     <button id="copyRawButton" class="copy-button" title="Copy to Clipboard"><i class="fa-solid fa-copy"></i></button>
                 </div>
                 <div id="rawTranscription" class="editor-content" contenteditable="true" placeholder="Your raw, unedited transcription will appear here after recording..."></div>
+            </div>
+            <div class="editor-pane">
+                <div class="editor-pane-header">
+                    <h3>Cleaned Transcript</h3>
+                    <button id="copyCleanedButton" class="copy-button" title="Copy to Clipboard"><i class="fa-solid fa-copy"></i></button>
+                </div>
+                <div id="cleanedTranscript" class="editor-content" contenteditable="true" placeholder="A cleaned-up version of the transcript will appear here..."></div>
             </div>
             <div class="editor-pane">
                 <div class="editor-pane-header">
@@ -342,12 +349,14 @@
                 this.cancelButton = document.getElementById('cancelButton');
                 this.recordingStatus = document.getElementById('recordingStatus');
                 this.rawTranscription = document.getElementById('rawTranscription');
+                this.cleanedTranscript = document.getElementById('cleanedTranscript');
                 this.polishedNote = document.getElementById('polishedNote');
                 this.newButton = document.getElementById('newButton');
                 this.themeToggleButton = document.getElementById('themeToggleButton');
                 this.themeToggleIcon = this.themeToggleButton.querySelector('i');
                 this.editorTitle = document.getElementById('editorTitle');
                 this.copyRawButton = document.getElementById('copyRawButton');
+                this.copyCleanedButton = document.getElementById('copyCleanedButton');
                 this.copyPolishedButton = document.getElementById('copyPolishedButton');
                 this.micSelect = document.getElementById('micSelect');
 
@@ -381,6 +390,7 @@
                 this.newButton.addEventListener('click', () => this.createNewNote());
                 this.themeToggleButton.addEventListener('click', () => this.toggleTheme());
                 this.copyRawButton.addEventListener('click', () => this.copyToClipboard('rawTranscription', this.copyRawButton));
+                this.copyCleanedButton.addEventListener('click', () => this.copyToClipboard('cleanedTranscript', this.copyCleanedButton));
                 this.copyPolishedButton.addEventListener('click', () => this.copyToClipboard('polishedNote', this.copyPolishedButton));
                 
                 this.micSelect.addEventListener('change', () => {
@@ -736,8 +746,14 @@
                     if (transcriptionText && !transcriptionText.includes('[NO SPEECH DETECTED]')) {
                         this.rawTranscription.textContent = transcriptionText;
                         this.rawTranscription.classList.remove('placeholder-active');
-                        this.recordingStatus.textContent = 'Polishing note...';
-                        await this.getPolishedNote(transcriptionText);
+                        
+                        this.recordingStatus.textContent = 'Cleaning and polishing...';
+                        await Promise.all([
+                            this.getCleanedTranscript(transcriptionText),
+                            this.getPolishedNote(transcriptionText)
+                        ]);
+                        this.recordingStatus.textContent = 'Note processed! Ready to record.';
+
                     } else {
                         throw new Error("No speech was detected in the audio.");
                     }
@@ -750,12 +766,37 @@
                 }
             }
 
-            async getPolishedNote(rawText) {
-                if (!rawText.trim()) {
-                    this.recordingStatus.textContent = 'No text to polish.';
-                    return;
-                }
+            async getCleanedTranscript(rawText) {
+                if (!rawText.trim()) return;
+                try {
+                    const model = this.genAI.getGenerativeModel({ model: MODEL_NAME });
+                    const prompt = `
+                        Please clean up the following raw audio transcript.
+                        - Remove all filler words (e.g., "um", "uh", "like", "you know").
+                        - Correct obvious stutters or false starts (e.g., "I, I think" becomes "I think").
+                        - Do NOT summarize, rephrase, or change the sentence structure. The goal is a verbatim transcript, just without the verbal tics.
+                        - Do NOT add any introductory text. Return only the cleaned text.
 
+                        Raw Transcript:
+                        ---
+                        ${rawText}
+                    `;
+                    const result = await model.generateContent(prompt);
+                    const response = await result.response;
+                    const cleanedText = response.text();
+                    if (cleanedText) {
+                        this.cleanedTranscript.textContent = cleanedText;
+                        this.cleanedTranscript.classList.remove('placeholder-active');
+                    }
+                } catch (error) {
+                    console.error("Error cleaning transcript:", error);
+                    this.cleanedTranscript.textContent = 'Error during cleaning process.';
+                    this.cleanedTranscript.classList.add('placeholder-active');
+                }
+            }
+
+            async getPolishedNote(rawText) {
+                if (!rawText.trim()) return;
                 try {
                     const model = this.genAI.getGenerativeModel({ model: MODEL_NAME });
                     const prompt = `
@@ -767,7 +808,7 @@
                         - Ensure the core meaning and all important information from the original transcription are preserved.
                         - IMPORTANT: Do not include any conversational preamble or introductory text like "Of course, here is...". Only return the formatted note content itself.
 
-                        Raw Transcription:
+                        Raw Transcript:
                         ---
                         ${rawText}
                     `;
@@ -780,13 +821,9 @@
                         this.polishedNote.innerHTML = marked.parse(polishedText);
                         this.polishedNote.classList.remove('placeholder-active');
                         this.setNoteTitle(polishedText);
-                        this.recordingStatus.textContent = 'Note polished! Ready to record.';
-                    } else {
-                        throw new Error("Polishing returned empty.");
                     }
                 } catch (error) {
                     console.error("Error polishing note:", error);
-                    this.recordingStatus.textContent = 'Error during polishing.';
                     this.polishedNote.innerHTML = `<p><em>Polishing failed. Raw transcript is available.</em></p>`;
                 }
             }
@@ -847,7 +884,7 @@
             createNewNote() {
                 this.currentNote = { id: `note_${Date.now()}` };
                 
-                ['rawTranscription', 'polishedNote', 'editorTitle'].forEach(id => {
+                ['rawTranscription', 'cleanedTranscript', 'polishedNote', 'editorTitle'].forEach(id => {
                     const el = document.getElementById(id);
                     const placeholder = el.getAttribute('placeholder') || '';
                     if (id === 'polishedNote') el.innerHTML = placeholder;
