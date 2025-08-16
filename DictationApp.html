@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Voice Notes</title>
+    <title>AI Voice Notes - Animated</title>
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     
@@ -19,6 +19,7 @@
             --color-placeholder: #6a6a6e;
             --color-cancel: #5856d6;
             --color-success: #34c759;
+            --shadow-color: rgba(0, 0, 0, 0.2);
         }
 
         body.light-mode {
@@ -28,6 +29,25 @@
             --ui-color: #ffffff;
             --border-color: #d1d1d6;
             --color-placeholder: #b0b0b5;
+            --shadow-color: rgba(0, 0, 0, 0.08);
+        }
+
+        /* --- Animation Keyframes --- */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse-record {
+            0% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(255, 59, 48, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); }
+        }
+
+        @keyframes checkmark-pop {
+            0% { transform: scale(0.5); opacity: 0; }
+            80% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); }
         }
 
         body {
@@ -38,15 +58,19 @@
             padding: 20px;
             display: flex;
             justify-content: center;
-            transition: background-color 0.3s, color 0.3s;
+            transition: background-color 0.4s, color 0.4s;
         }
 
         .container {
             width: 100%;
-            max-width: 1200px; /* Increased max-width for 3 columns */
+            max-width: 1200px;
             display: flex;
             flex-direction: column;
             gap: 20px;
+        }
+
+        header, .editor-pane, .recording-interface {
+            transition: background-color 0.4s, border-color 0.4s;
         }
 
         header {
@@ -73,15 +97,17 @@
             font-size: 1.2em;
             padding: 8px;
             border-radius: 8px;
+            transition: background-color 0.2s, color 0.2s, transform 0.2s;
         }
         .header-actions button:hover {
             background-color: var(--border-color);
             color: var(--text-color);
+            transform: scale(1.1);
         }
 
         main {
             display: grid;
-            grid-template-columns: repeat(3, 1fr); /* Three columns */
+            grid-template-columns: repeat(3, 1fr);
             gap: 20px;
         }
 
@@ -92,6 +118,12 @@
             padding: 15px;
             display: flex;
             flex-direction: column;
+            box-shadow: 0 4px 12px var(--shadow-color);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .editor-pane:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px var(--shadow-color);
         }
 
         .editor-pane-header {
@@ -114,9 +146,12 @@
             cursor: pointer;
             font-size: 1em;
             padding: 5px;
+            transition: color 0.3s, transform 0.3s;
         }
-        .copy-button:hover {
-            color: var(--text-color);
+        .copy-button:hover { color: var(--text-color); }
+        .copy-button.copied {
+            transform: scale(1.1);
+            color: var(--color-success);
         }
 
         .editor-content {
@@ -124,6 +159,10 @@
             outline: none;
             line-height: 1.6;
             min-height: 300px;
+            transition: opacity 0.4s;
+        }
+        .editor-content.is-updating {
+            opacity: 0;
         }
         
         #polishedNote p { margin-top: 0; }
@@ -132,15 +171,12 @@
         #polishedNote code { background-color: var(--border-color); padding: 2px 5px; border-radius: 4px; }
         #polishedNote blockquote { border-left: 3px solid var(--border-color); padding-left: 10px; color: var(--text-secondary-color); margin-left: 0; }
 
-
         .placeholder-active {
             color: var(--color-placeholder);
             font-style: italic;
         }
 
-        footer {
-            text-align: center;
-        }
+        footer { text-align: center; }
 
         .recording-interface {
             position: relative;
@@ -152,16 +188,22 @@
             flex-direction: column;
             align-items: center;
             gap: 15px;
+            overflow: hidden;
         }
         
-        .status-indicator, #liveRecordingTitle, #liveRecordingTimerDisplay {
-            color: var(--text-secondary-color);
-            font-size: 0.9em;
+        /* --- Animated UI Elements --- */
+        .hidable {
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            opacity: 1;
+            transform: translateY(0);
         }
-
-        #liveRecordingTitle { font-weight: bold; font-size: 1.1em; display: none; }
-        #liveRecordingTimerDisplay { font-family: monospace; font-size: 1.2em; display: none; }
-        #liveWaveformCanvas { width: 100%; height: 60px; display: none; margin-bottom: 15px; }
+        .hidable.is-hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(10px);
+            position: absolute; /* Take out of layout flow when hidden */
+        }
+        #liveWaveformCanvas { height: 60px; width: 100%; margin-bottom: 15px; }
 
         .mic-selector-wrapper {
             display: flex;
@@ -202,9 +244,13 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: transform 0.2s, box-shadow 0.2s, background-color 0.3s;
         }
         #recordButton:hover { transform: scale(1.05); }
+        #recordButton.recording {
+            animation: pulse-record 2s infinite;
+        }
         .record-button-inner {
             width: 60px;
             height: 60px;
@@ -213,11 +259,16 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            transition: background-color 0.4s;
         }
-        .record-button-inner i { color: var(--color-recording); font-size: 24px; }
-        
+        .record-button-inner i { 
+            color: var(--color-recording); 
+            font-size: 24px; 
+            transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28), border-radius 0.3s ease;
+        }
         #recordButton.recording .record-button-inner i.fa-stop {
-            border-radius: 4px; /* Makes the stop icon a square */
+            transform: scale(0.7);
+            border-radius: 4px;
         }
 
         #cancelButton {
@@ -228,11 +279,11 @@
             background-color: var(--ui-color);
             color: var(--text-secondary-color);
             cursor: pointer;
-            display: none; /* Initially hidden */
+            display: flex;
             justify-content: center;
             align-items: center;
             font-size: 1.2em;
-            transition: background-color 0.2s, color 0.2s;
+            transition: background-color 0.2s, color 0.2s, opacity 0.4s, transform 0.4s;
         }
         #cancelButton:hover {
             background-color: var(--color-cancel);
@@ -240,7 +291,7 @@
         }
 
         .progress-indicator {
-            display: none; /* Hidden by default */
+            display: flex;
             align-items: center;
             gap: 10px;
             font-size: 0.9em;
@@ -250,15 +301,14 @@
             display: flex;
             align-items: center;
             gap: 5px;
-            transition: color 0.3s;
+            transition: color 0.4s, transform 0.4s;
         }
         .progress-step.active {
             color: var(--text-color);
             font-weight: 600;
+            transform: scale(1.05);
         }
-        .progress-step.completed {
-            color: var(--color-success);
-        }
+        .progress-step.completed { color: var(--color-success); }
 
         .dot-container {
             width: 16px;
@@ -282,11 +332,10 @@
             display: none;
             color: var(--color-success);
         }
-        .progress-step.completed .dot {
-            display: none;
-        }
+        .progress-step.completed .dot { display: none; }
         .progress-step.completed .checkmark {
             display: inline-block;
+            animation: checkmark-pop 0.4s ease-out;
         }
 
         @keyframes pulse {
@@ -294,11 +343,8 @@
             50% { transform: scale(1.4); opacity: 0.7; }
         }
 
-        /* Responsive Design */
-        @media (max-width: 992px) { /* Adjusted for 3 columns */
-            main {
-                grid-template-columns: 1fr;
-            }
+        @media (max-width: 992px) {
+            main { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -339,35 +385,18 @@
 
         <footer>
             <div class="recording-interface">
-                <div class="status-indicator" id="recordingStatus">Ready to record</div>
-                <div class="progress-indicator" id="progressIndicator">
-                    <div class="progress-step" id="step1">
-                        <div class="dot-container">
-                            <div class="dot"></div>
-                            <i class="fa-solid fa-check checkmark"></i>
-                        </div> 
-                        <span class="label">Transcribing</span>
-                    </div>
+                <div class="status-indicator hidable" id="recordingStatus">Ready to record</div>
+                <div class="progress-indicator hidable is-hidden" id="progressIndicator">
+                    <!-- Progress steps -->
+                    <div class="progress-step" id="step1"><div class="dot-container"><div class="dot"></div><i class="fa-solid fa-check checkmark"></i></div><span class="label">Transcribing</span></div>
                     <i class="fa-solid fa-arrow-right-long"></i>
-                    <div class="progress-step" id="step2">
-                        <div class="dot-container">
-                            <div class="dot"></div>
-                            <i class="fa-solid fa-check checkmark"></i>
-                        </div>
-                        <span class="label">Cleaning</span>
-                    </div>
+                    <div class="progress-step" id="step2"><div class="dot-container"><div class="dot"></div><i class="fa-solid fa-check checkmark"></i></div><span class="label">Cleaning</span></div>
                     <i class="fa-solid fa-arrow-right-long"></i>
-                    <div class="progress-step" id="step3">
-                        <div class="dot-container">
-                            <div class="dot"></div>
-                            <i class="fa-solid fa-check checkmark"></i>
-                        </div>
-                        <span class="label">Polishing</span>
-                    </div>
+                    <div class="progress-step" id="step3"><div class="dot-container"><div class="dot"></div><i class="fa-solid fa-check checkmark"></i></div><span class="label">Polishing</span></div>
                 </div>
-                <div id="liveRecordingTitle"></div>
-                <canvas id="liveWaveformCanvas"></canvas>
-                <div id="liveRecordingTimerDisplay">00:00.00</div>
+                <div id="liveRecordingTitle" class="hidable is-hidden"></div>
+                <canvas id="liveWaveformCanvas" class="hidable is-hidden"></canvas>
+                <div id="liveRecordingTimerDisplay" class="hidable is-hidden">00:00.00</div>
                 
                 <div class="mic-selector-wrapper">
                     <i class="fa-solid fa-microphone-lines"></i>
@@ -376,47 +405,35 @@
 
                 <div class="button-wrapper">
                     <button id="recordButton" title="Start Recording">
-                        <div class="record-button-inner">
-                            <i class="fa-solid fa-microphone"></i>
-                        </div>
+                        <div class="record-button-inner"><i class="fa-solid fa-microphone"></i></div>
                     </button>
-                    <button id="cancelButton" title="Cancel Recording">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
+                    <button id="cancelButton" title="Cancel Recording" class="hidable is-hidden"><i class="fa-solid fa-xmark"></i></button>
                 </div>
             </div>
         </footer>
     </div>
     
-    <!-- Load required libraries from CDN -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
     <script type="module">
-        // Import the Google AI SDK from the CDN
         import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
         
-        // PASTE YOUR GEMINI API KEY HERE
-        const GEMINI_API_KEY = "AIzaSyBxTxlsEWktNIIwBORKaGJwvOue45lRjMk";
-        
-        const MODEL_NAME = "gemini-2.5-pro";
+        const GEMINI_API_KEY = "AIzaSyBxTxlsEWktNIIwBORKaGJwvOue45lRjMk"; // PASTE YOUR GEMINI API KEY HERE
+        const MODEL_NAME = "gemini-1.5-flash";
 
         class VoiceNotesApp {
             constructor() {
-                if (!GEMINI_API_KEY || GEMINI_API_KEY === "YOUR_API_KEY_HERE") {
+                if (!GEMINI_API_KEY) {
                     alert("Please set your GEMINI_API_KEY in the script tag.");
                     return;
                 }
                 
                 this.genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-
-                this.mediaRecorder = null;
-                this.audioChunks = [];
                 this.isRecording = false;
                 this.isCancelled = false;
-                this.currentNote = null;
+                this.audioChunks = [];
+                this.mediaRecorder = null;
                 this.stream = null;
-                
-                // Audio visualization properties
                 this.audioContext = null;
                 this.analyserNode = null;
                 this.waveformDataArray = null;
@@ -425,45 +442,37 @@
                 this.recordingStartTime = 0;
                 this.maxVolumeDuringRecording = 0;
 
-                // Bind HTML Elements
-                this.recordButton = document.getElementById('recordButton');
-                this.cancelButton = document.getElementById('cancelButton');
-                this.recordingStatus = document.getElementById('recordingStatus');
-                this.progressIndicator = document.getElementById('progressIndicator');
-                this.rawTranscription = document.getElementById('rawTranscription');
-                this.cleanedTranscript = document.getElementById('cleanedTranscript');
-                this.polishedNote = document.getElementById('polishedNote');
-                this.newButton = document.getElementById('newButton');
-                this.themeToggleButton = document.getElementById('themeToggleButton');
-                this.themeToggleIcon = this.themeToggleButton.querySelector('i');
-                this.editorTitle = document.getElementById('editorTitle');
-                this.copyRawButton = document.getElementById('copyRawButton');
-                this.copyCleanedButton = document.getElementById('copyCleanedButton');
-                this.copyPolishedButton = document.getElementById('copyPolishedButton');
-                this.micSelect = document.getElementById('micSelect');
-
-                this.recordingInterface = document.querySelector('.recording-interface');
-                this.liveRecordingTitle = document.getElementById('liveRecordingTitle');
-                this.liveWaveformCanvas = document.getElementById('liveWaveformCanvas');
-                this.liveWaveformCtx = this.liveWaveformCanvas.getContext('2d');
-                this.liveRecordingTimerDisplay = document.getElementById('liveRecordingTimerDisplay');
-                this.statusIndicatorDiv = this.recordingInterface.querySelector('.status-indicator');
-
+                this.bindElements();
                 this.bindEventListeners();
                 this.initTheme();
                 this.createNewNote();
             }
 
-            async init() {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    stream.getTracks().forEach(track => track.stop());
-                    await this.populateMicList();
-                } catch (error) {
-                    console.error("Error getting microphone permission on load:", error);
-                    this.recordingStatus.textContent = "Mic permission needed. Please allow and reload.";
-                    await this.populateMicList();
-                }
+            bindElements() {
+                // Main UI
+                this.recordButton = document.getElementById('recordButton');
+                this.cancelButton = document.getElementById('cancelButton');
+                this.newButton = document.getElementById('newButton');
+                this.themeToggleButton = document.getElementById('themeToggleButton');
+                this.themeToggleIcon = this.themeToggleButton.querySelector('i');
+                this.micSelect = document.getElementById('micSelect');
+                
+                // Editor panes
+                this.editorTitle = document.getElementById('editorTitle');
+                this.rawTranscription = document.getElementById('rawTranscription');
+                this.cleanedTranscript = document.getElementById('cleanedTranscript');
+                this.polishedNote = document.getElementById('polishedNote');
+                this.copyRawButton = document.getElementById('copyRawButton');
+                this.copyCleanedButton = document.getElementById('copyCleanedButton');
+                this.copyPolishedButton = document.getElementById('copyPolishedButton');
+
+                // Dynamic Displays
+                this.recordingStatus = document.getElementById('recordingStatus');
+                this.progressIndicator = document.getElementById('progressIndicator');
+                this.liveRecordingTitle = document.getElementById('liveRecordingTitle');
+                this.liveWaveformCanvas = document.getElementById('liveWaveformCanvas');
+                this.liveWaveformCtx = this.liveWaveformCanvas.getContext('2d');
+                this.liveRecordingTimerDisplay = document.getElementById('liveRecordingTimerDisplay');
             }
 
             bindEventListeners() {
@@ -474,13 +483,21 @@
                 this.copyRawButton.addEventListener('click', () => this.copyToClipboard('rawTranscription', this.copyRawButton));
                 this.copyCleanedButton.addEventListener('click', () => this.copyToClipboard('cleanedTranscript', this.copyCleanedButton));
                 this.copyPolishedButton.addEventListener('click', () => this.copyToClipboard('polishedNote', this.copyPolishedButton));
-                
-                this.micSelect.addEventListener('change', () => {
-                    localStorage.setItem('selectedMicId', this.micSelect.value);
-                });
+                this.micSelect.addEventListener('change', () => localStorage.setItem('selectedMicId', this.micSelect.value));
                 navigator.mediaDevices.addEventListener('devicechange', () => this.populateMicList());
-                
-                window.addEventListener('resize', this.handleResize.bind(this));
+                window.addEventListener('resize', () => this.handleResize());
+            }
+            
+            async init() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    stream.getTracks().forEach(track => track.stop());
+                    await this.populateMicList();
+                } catch (error) {
+                    console.error("Mic permission error on load:", error);
+                    this.recordingStatus.textContent = "Mic permission needed. Please allow and reload.";
+                    await this.populateMicList(); // Still try to populate, might be empty
+                }
             }
 
             async populateMicList() {
@@ -488,16 +505,13 @@
                     const devices = await navigator.mediaDevices.enumerateDevices();
                     const audioInputs = devices.filter(device => device.kind === 'audioinput');
                     
-                    const currentMicValue = this.micSelect.value;
                     this.micSelect.innerHTML = '';
-                    
                     if (audioInputs.length === 0) {
                         this.micSelect.innerHTML = '<option>No microphones found</option>';
                         return;
                     }
 
                     const savedMicId = localStorage.getItem('selectedMicId');
-
                     audioInputs.forEach(device => {
                         const option = document.createElement('option');
                         option.value = device.deviceId;
@@ -507,61 +521,45 @@
                     
                     if (savedMicId && audioInputs.some(d => d.deviceId === savedMicId)) {
                         this.micSelect.value = savedMicId;
-                    } else if (currentMicValue && audioInputs.some(d => d.deviceId === currentMicValue)) {
-                        this.micSelect.value = currentMicValue;
                     }
-
                 } catch (error) {
-                    console.error("Error populating microphone list:", error);
+                    console.error("Error populating mic list:", error);
                     this.micSelect.innerHTML = '<option>Could not access mics</option>';
                 }
             }
 
             handleResize() {
-                if (this.isRecording && this.liveWaveformCanvas && this.liveWaveformCanvas.style.display === 'block') {
-                    requestAnimationFrame(() => {
-                        this.setupCanvasDimensions();
-                    });
+                if (this.isRecording) {
+                    requestAnimationFrame(() => this.setupCanvasDimensions());
                 }
             }
             
             setupCanvasDimensions() {
-                if (!this.liveWaveformCanvas || !this.liveWaveformCtx) return;
-                const canvas = this.liveWaveformCanvas;
+                if (!this.liveWaveformCanvas) return;
                 const dpr = window.devicePixelRatio || 1;
-                const rect = canvas.getBoundingClientRect();
-                canvas.width = rect.width * dpr;
-                canvas.height = rect.height * dpr;
+                const rect = this.liveWaveformCanvas.getBoundingClientRect();
+                this.liveWaveformCanvas.width = rect.width * dpr;
+                this.liveWaveformCanvas.height = rect.height * dpr;
                 this.liveWaveformCtx.scale(dpr, dpr);
             }
 
             initTheme() {
-                if (localStorage.getItem('theme') === 'light') {
+                const theme = localStorage.getItem('theme');
+                if (theme === 'light') {
                     document.body.classList.add('light-mode');
                     this.themeToggleIcon.classList.replace('fa-sun', 'fa-moon');
-                } else {
-                    document.body.classList.remove('light-mode');
-                    this.themeToggleIcon.classList.replace('fa-moon', 'fa-sun');
                 }
             }
 
             toggleTheme() {
                 document.body.classList.toggle('light-mode');
-                if (document.body.classList.contains('light-mode')) {
-                    localStorage.setItem('theme', 'light');
-                    this.themeToggleIcon.classList.replace('fa-sun', 'fa-moon');
-                } else {
-                    localStorage.setItem('theme', 'dark');
-                    this.themeToggleIcon.classList.replace('fa-moon', 'fa-sun');
-                }
+                const isLight = document.body.classList.contains('light-mode');
+                localStorage.setItem('theme', isLight ? 'light' : 'dark');
+                this.themeToggleIcon.classList.replace(isLight ? 'fa-sun' : 'fa-moon', isLight ? 'fa-moon' : 'fa-sun');
             }
 
             async toggleRecording() {
-                if (!this.isRecording) {
-                    await this.startRecording();
-                } else {
-                    await this.stopRecording();
-                }
+                this.isRecording ? this.stopRecording() : this.startRecording();
             }
             
             setupAudioVisualizer() {
@@ -570,50 +568,41 @@
                 const source = this.audioContext.createMediaStreamSource(this.stream);
                 this.analyserNode = this.audioContext.createAnalyser();
                 this.analyserNode.fftSize = 256;
-                this.analyserNode.smoothingTimeConstant = 0.5;
-                const bufferLength = this.analyserNode.frequencyBinCount;
-                this.waveformDataArray = new Uint8Array(bufferLength);
+                this.analyserNode.smoothingTimeConstant = 0.6;
+                this.waveformDataArray = new Uint8Array(this.analyserNode.frequencyBinCount);
                 source.connect(this.analyserNode);
             }
 
             drawLiveWaveform() {
-                if (!this.analyserNode || !this.waveformDataArray || !this.liveWaveformCtx || !this.isRecording) {
+                if (!this.isRecording) {
                     if (this.waveformDrawingId) cancelAnimationFrame(this.waveformDrawingId);
                     this.waveformDrawingId = null;
                     return;
                 }
 
                 this.waveformDrawingId = requestAnimationFrame(() => this.drawLiveWaveform());
-                
                 this.analyserNode.getByteFrequencyData(this.waveformDataArray);
 
                 const ctx = this.liveWaveformCtx;
-                const canvas = this.liveWaveformCanvas;
-                const { width, height } = canvas.getBoundingClientRect();
-                
+                const { width, height } = this.liveWaveformCanvas.getBoundingClientRect();
                 ctx.clearRect(0, 0, width, height);
-                
-                const barCount = this.waveformDataArray.length * 0.7;
-                const barWidth = width / barCount / 1.5;
-                const barSpacing = barWidth * 0.5;
-                let x = 0;
 
-                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-recording').trim();
+                const barCount = this.waveformDataArray.length * 0.8;
+                const barWidth = width / barCount;
+                ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-recording').trim();
+                ctx.lineWidth = barWidth * 0.7;
+                ctx.lineCap = 'round';
                 
                 let currentMaxVolume = 0;
                 for (let i = 0; i < barCount; i++) {
-                    const barHeight = (this.waveformDataArray[i] / 255) * height;
-                    if (this.waveformDataArray[i] > currentMaxVolume) {
-                        currentMaxVolume = this.waveformDataArray[i];
-                    }
-                    const y = height - barHeight;
-                    ctx.fillRect(x, y, barWidth, barHeight);
-                    x += barWidth + barSpacing;
+                    const barHeight = Math.max((this.waveformDataArray[i] / 255) * height, 2);
+                    if (this.waveformDataArray[i] > currentMaxVolume) currentMaxVolume = this.waveformDataArray[i];
+                    ctx.beginPath();
+                    ctx.moveTo(i * barWidth, height);
+                    ctx.lineTo(i * barWidth, height - barHeight);
+                    ctx.stroke();
                 }
-                
-                if (currentMaxVolume > this.maxVolumeDuringRecording) {
-                    this.maxVolumeDuringRecording = currentMaxVolume;
-                }
+                if (currentMaxVolume > this.maxVolumeDuringRecording) this.maxVolumeDuringRecording = currentMaxVolume;
             }
             
             updateLiveTimer() {
@@ -627,17 +616,14 @@
             }
 
             startLiveDisplay() {
-                this.recordingInterface.classList.add('is-live');
-                this.liveRecordingTitle.style.display = 'block';
-                this.liveWaveformCanvas.style.display = 'block';
-                this.liveRecordingTimerDisplay.style.display = 'block';
-                this.statusIndicatorDiv.style.display = 'none';
-                this.cancelButton.style.display = 'flex';
-
-                this.setupCanvasDimensions();
+                this.liveRecordingTitle.classList.remove('is-hidden');
+                this.liveWaveformCanvas.classList.remove('is-hidden');
+                this.liveRecordingTimerDisplay.classList.remove('is-hidden');
+                this.recordingStatus.classList.add('is-hidden');
+                this.cancelButton.classList.remove('is-hidden');
                 
-                const iconElement = this.recordButton.querySelector('i');
-                iconElement.classList.replace('fa-microphone', 'fa-stop');
+                this.setupCanvasDimensions();
+                this.recordButton.querySelector('i').classList.replace('fa-microphone', 'fa-stop');
                 
                 const currentTitle = this.editorTitle.textContent.trim();
                 const placeholder = this.editorTitle.getAttribute('placeholder');
@@ -652,51 +638,21 @@
             }
 
             stopLiveDisplay() {
-                this.recordingInterface.classList.remove('is-live');
-                this.liveRecordingTitle.style.display = 'none';
-                this.liveWaveformCanvas.style.display = 'none';
-                this.liveRecordingTimerDisplay.style.display = 'none';
-                this.statusIndicatorDiv.style.display = 'block';
-                this.cancelButton.style.display = 'none';
+                this.liveRecordingTitle.classList.add('is-hidden');
+                this.liveWaveformCanvas.classList.add('is-hidden');
+                this.liveRecordingTimerDisplay.classList.add('is-hidden');
+                this.recordingStatus.classList.remove('is-hidden');
+                this.cancelButton.classList.add('is-hidden');
                 
-                const iconElement = this.recordButton.querySelector('i');
-                iconElement.classList.replace('fa-stop', 'fa-microphone');
+                this.recordButton.querySelector('i').classList.replace('fa-stop', 'fa-microphone');
                 
                 if (this.waveformDrawingId) cancelAnimationFrame(this.waveformDrawingId);
                 if (this.timerIntervalId) clearInterval(this.timerIntervalId);
-                
                 this.waveformDrawingId = null;
                 this.timerIntervalId = null;
 
-                if (this.audioContext && this.audioContext.state !== 'closed') {
-                    this.audioContext.close();
-                }
+                if (this.audioContext && this.audioContext.state !== 'closed') this.audioContext.close();
                 this.audioContext = null;
-            }
-
-            setupMediaSession() {
-                if ('mediaSession' in navigator) {
-                    navigator.mediaSession.metadata = new MediaMetadata({
-                        title: 'AI Voice Note Recording',
-                        artist: 'DictationApp',
-                    });
-
-                    navigator.mediaSession.setActionHandler('pause', () => {
-                        if (this.isRecording) this.stopRecording();
-                    });
-                    
-                    navigator.mediaSession.setActionHandler('stop', () => {
-                        if (this.isRecording) this.stopRecording();
-                    });
-                }
-            }
-
-            clearMediaSession() {
-                if ('mediaSession' in navigator) {
-                    navigator.mediaSession.metadata = null;
-                    navigator.mediaSession.setActionHandler('pause', null);
-                    navigator.mediaSession.setActionHandler('stop', null);
-                }
             }
 
             async startRecording() {
@@ -707,51 +663,31 @@
                     this.recordingStatus.textContent = 'Recording...';
                     
                     const selectedMicId = this.micSelect.value;
-                    const constraints = {
-                        audio: {
-                            deviceId: selectedMicId ? { exact: selectedMicId } : undefined
-                        }
-                    };
-
-                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    this.stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: selectedMicId ? { exact: selectedMicId } : undefined } });
                     
                     this.mediaRecorder = new MediaRecorder(this.stream);
-                    
-                    this.mediaRecorder.ondataavailable = (event) => {
-                        if (event.data.size > 0) this.audioChunks.push(event.data);
-                    };
-
+                    this.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) this.audioChunks.push(e.data) };
                     this.mediaRecorder.onstop = () => {
                         this.stopLiveDisplay();
-                        this.clearMediaSession();
-                        
                         if (this.isCancelled) {
                             if (this.stream) this.stream.getTracks().forEach(track => track.stop());
-                            this.stream = null;
                             return;
                         }
-
-                        const SILENCE_THRESHOLD = 10;
-                        if (this.maxVolumeDuringRecording < SILENCE_THRESHOLD) {
-                            this.recordingStatus.textContent = 'Recording was silent. Check mic volume.';
-                            this.rawTranscription.textContent = 'Recording appears to be silent. Please check your system microphone settings and ensure your mic is not muted.';
-                            this.rawTranscription.classList.add('placeholder-active');
+                        if (this.maxVolumeDuringRecording < 10) { // Silence threshold
+                            this.recordingStatus.textContent = 'Recording was silent. Check mic.';
+                            this.typeEffect(this.rawTranscription, 'Recording appears to be silent. Please check your system microphone settings and ensure your mic is not muted.');
                             if (this.stream) this.stream.getTracks().forEach(track => track.stop());
-                            this.stream = null;
                             return;
                         }
-
                         if (this.audioChunks.length > 0) {
                             const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
                             this.processAudio(audioBlob);
                         }
                         if (this.stream) this.stream.getTracks().forEach(track => track.stop());
-                        this.stream = null;
                     };
 
                     this.mediaRecorder.start();
                     this.isRecording = true;
-                    this.setupMediaSession();
                     this.recordButton.classList.add('recording');
                     this.recordButton.setAttribute('title', 'Stop Recording');
                     this.micSelect.disabled = true;
@@ -759,14 +695,14 @@
 
                 } catch (error) {
                     console.error("Error starting recording:", error);
-                    this.recordingStatus.textContent = `Error: Could not start recording. ${error.message}`;
+                    this.recordingStatus.textContent = `Error: ${error.message}`;
                     this.isRecording = false;
                     this.recordButton.classList.remove('recording');
                     this.stopLiveDisplay();
                 }
             }
 
-            async stopRecording() {
+            stopRecording() {
                 if (this.mediaRecorder && this.isRecording) {
                     this.mediaRecorder.stop();
                     this.isRecording = false;
@@ -779,10 +715,8 @@
 
             cancelRecording() {
                 if (!this.isRecording) return;
-                
                 this.isCancelled = true;
                 this.mediaRecorder.stop();
-
                 this.isRecording = false;
                 this.recordButton.classList.remove('recording');
                 this.recordButton.setAttribute('title', 'Start Recording');
@@ -792,221 +726,133 @@
             }
             
             async fileToGenerativePart(blob, mimeType) {
-                return new Promise((resolve, reject) => {
+                const base64Data = await new Promise(resolve => {
                     const reader = new FileReader();
-                    reader.onloadend = () => {
-                        const base64Data = reader.result.split(',')[1];
-                        resolve({
-                            inlineData: {
-                                data: base64Data,
-                                mimeType
-                            }
-                        });
-                    };
-                    reader.onerror = (err) => reject(err);
+                    reader.onloadend = () => resolve(reader.result.split(',')[1]);
                     reader.readAsDataURL(blob);
                 });
+                return { inlineData: { data: base64Data, mimeType } };
             }
 
-            updateProgress(status) {
-                this.progressIndicator.style.display = 'flex';
-                this.statusIndicatorDiv.style.display = 'none';
+            updateProgress(stage) {
+                this.progressIndicator.classList.toggle('is-hidden', stage === 'off');
+                this.recordingStatus.classList.toggle('is-hidden', stage !== 'off');
                 
                 const steps = {
-                    step1: { el: document.getElementById('step1'), label: 'Transcribing', pastLabel: 'Transcribed' },
-                    step2: { el: document.getElementById('step2'), label: 'Cleaning', pastLabel: 'Cleaned' },
-                    step3: { el: document.getElementById('step3'), label: 'Polishing', pastLabel: 'Polished' }
+                    step1: { el: document.getElementById('step1'), label: 'Transcribing', past: 'Transcribed' },
+                    step2: { el: document.getElementById('step2'), label: 'Cleaning', past: 'Cleaned' },
+                    step3: { el: document.getElementById('step3'), label: 'Polishing', past: 'Polished' }
                 };
 
-                Object.values(steps).forEach(step => {
-                    step.el.classList.remove('active', 'completed');
-                    step.el.querySelector('.label').textContent = step.label;
+                Object.values(steps).forEach(s => {
+                    s.el.classList.remove('active', 'completed');
+                    s.el.querySelector('.label').textContent = s.label;
                 });
 
-                if (status.stage === 'transcribing') {
-                    steps.step1.el.classList.add('active');
-                } else if (status.stage === 'processing') {
+                if (stage === 'transcribing') steps.step1.el.classList.add('active');
+                else if (stage === 'processing') {
                     steps.step1.el.classList.add('completed');
-                    steps.step1.el.querySelector('.label').textContent = steps.step1.pastLabel;
+                    steps.step1.el.querySelector('.label').textContent = steps.step1.past;
                     steps.step2.el.classList.add('active');
                     steps.step3.el.classList.add('active');
-                } else if (status.stage === 'complete') {
-                    Object.values(steps).forEach(step => {
-                        step.el.classList.remove('active');
-                        step.el.classList.add('completed');
-                        step.el.querySelector('.label').textContent = step.pastLabel;
+                } else if (stage === 'complete') {
+                    Object.values(steps).forEach(s => {
+                        s.el.classList.remove('active');
+                        s.el.classList.add('completed');
+                        s.el.querySelector('.label').textContent = s.past;
                     });
                 }
             }
 
             async processAudio(audioBlob) {
-                if (audioBlob.size === 0) {
-                    this.recordingStatus.textContent = 'No audio captured. Try again.';
-                    return;
-                }
-                
                 try {
-                    this.updateProgress({ stage: 'transcribing' });
-                    
+                    this.updateProgress('transcribing');
                     const model = this.genAI.getGenerativeModel({ model: MODEL_NAME });
                     const audioPart = await this.fileToGenerativePart(audioBlob, audioBlob.type);
                     
-                    const prompt = "Transcribe the spoken words in this audio recording. If there is no clear speech, respond with the single phrase: '[NO SPEECH DETECTED]'. Do not describe background noises.";
+                    const prompt = "Transcribe the spoken words in this audio. If no clear speech, respond with '[NO SPEECH DETECTED]'.";
                     const result = await model.generateContent([prompt, audioPart]);
-                    const response = await result.response;
-                    let transcriptionText = response.text();
+                    const transcriptionText = result.response.text();
 
-                    if (transcriptionText && !transcriptionText.includes('[NO SPEECH DETECTED]')) {
-                        this.rawTranscription.textContent = transcriptionText;
-                        this.rawTranscription.classList.remove('placeholder-active');
-                        
-                        this.updateProgress({ stage: 'processing' });
-                        
-                        await Promise.all([
-                            this.getCleanedTranscript(transcriptionText),
-                            this.getPolishedNote(transcriptionText)
-                        ]);
-
-                        this.updateProgress({ stage: 'complete' });
-                        
-                        this.recordingStatus.textContent = 'Note processed! Ready to record.';
-                        setTimeout(() => {
-                            this.progressIndicator.style.display = 'none';
-                            this.statusIndicatorDiv.style.display = 'block';
-                        }, 2000);
-
-                    } else {
+                    if (!transcriptionText || transcriptionText.includes('[NO SPEECH DETECTED]')) {
                         throw new Error("No speech was detected in the audio.");
                     }
 
+                    await this.typeEffect(this.rawTranscription, transcriptionText);
+                    this.updateProgress('processing');
+
+                    const cleanedPromise = this.getCleanedTranscript(transcriptionText);
+                    const polishedPromise = this.getPolishedNote(transcriptionText);
+
+                    cleanedPromise.then(text => { if (text) this.typeEffect(this.cleanedTranscript, text) });
+                    polishedPromise.then(text => { if (text) this.typeEffect(this.polishedNote, text, true) });
+
+                    await Promise.all([cleanedPromise, polishedPromise]);
+
+                    this.updateProgress('complete');
+                    this.recordingStatus.textContent = 'Note processed! Ready to record.';
+                    setTimeout(() => this.updateProgress('off'), 2000);
+
                 } catch (error) {
-                    console.error("Error in processAudio:", error);
+                    console.error("Error processing audio:", error);
                     this.recordingStatus.textContent = error.message;
-                    this.rawTranscription.textContent = 'Could not detect speech. Please try recording again in a quieter environment.';
-                    this.rawTranscription.classList.add('placeholder-active');
-                    this.progressIndicator.style.display = 'none';
-                    this.statusIndicatorDiv.style.display = 'block';
+                    this.typeEffect(this.rawTranscription, 'Could not detect speech. Please try recording again in a quieter environment.');
+                    this.updateProgress('off');
                 }
             }
 
             async getCleanedTranscript(rawText) {
-                if (!rawText.trim()) return;
+                if (!rawText.trim()) return '';
                 try {
                     const model = this.genAI.getGenerativeModel({ model: MODEL_NAME });
-                    const prompt = `
-                        Please clean up the following raw audio transcript.
-                        - Remove all filler words (e.g., "um", "uh", "like", "you know").
-                        - Correct obvious stutters or false starts (e.g., "I, I think" becomes "I think").
-                        - Do NOT summarize, rephrase, or change the sentence structure. The goal is a verbatim transcript, just without the verbal tics.
-                        - Do NOT add any introductory text. Return only the cleaned text.
-
-                        Raw Transcript:
-                        ---
-                        ${rawText}
-                    `;
+                    const prompt = `Clean this transcript: remove filler words (um, uh, like), stutters, and false starts. Do NOT summarize or rephrase. Return only the cleaned text.\n\n---\n${rawText}`;
                     const result = await model.generateContent(prompt);
-                    const response = await result.response;
-                    const cleanedText = response.text();
-                    if (cleanedText) {
-                        this.cleanedTranscript.textContent = cleanedText;
-                        this.cleanedTranscript.classList.remove('placeholder-active');
-                    }
+                    return result.response.text();
                 } catch (error) {
                     console.error("Error cleaning transcript:", error);
-                    this.cleanedTranscript.textContent = 'Error during cleaning process.';
-                    this.cleanedTranscript.classList.add('placeholder-active');
+                    return 'Error during cleaning process.';
                 }
             }
 
             async getPolishedNote(rawText) {
-                if (!rawText.trim()) return;
+                if (!rawText.trim()) return '';
                 try {
                     const model = this.genAI.getGenerativeModel({ model: MODEL_NAME });
-                    const prompt = `
-                        Take the following raw transcription and turn it into a polished, well-formatted note.
-                        - Correct any spelling or grammatical errors.
-                        - Remove filler words (like "um", "uh", "you know") and false starts.
-                        - Structure the content logically with paragraphs.
-                        - Use markdown for formatting: use headings (#, ##), bullet points (*), and bold text (**) where appropriate to enhance readability.
-                        - Ensure the core meaning and all important information from the original transcription are preserved.
-                        - IMPORTANT: Do not include any conversational preamble or introductory text like "Of course, here is...". Only return the formatted note content itself.
-
-                        Raw Transcript:
-                        ---
-                        ${rawText}
-                    `;
-
+                    const prompt = `Turn this raw transcript into a polished, well-formatted note using markdown (headings, bullets, bolding). Correct grammar and spelling. Preserve all key information. Return only the formatted note.\n\n---\n${rawText}`;
                     const result = await model.generateContent(prompt);
-                    const response = await result.response;
-                    const polishedText = response.text();
-
-                    if ( polishedText ) {
-                        this.polishedNote.innerHTML = marked.parse(polishedText);
-                        this.polishedNote.classList.remove('placeholder-active');
-                        this.setNoteTitle(polishedText);
-                    }
+                    const polishedText = result.response.text();
+                    if (polishedText) this.setNoteTitle(polishedText);
+                    return polishedText;
                 } catch (error) {
                     console.error("Error polishing note:", error);
-                    this.polishedNote.innerHTML = `<p><em>Polishing failed. Raw transcript is available.</em></p>`;
+                    return '<p><em>Polishing failed. Raw transcript is available.</em></p>';
                 }
             }
             
             setNoteTitle(polishedText) {
                 const lines = polishedText.split('\n');
-                let title = '';
-                
                 const h1 = lines.find(line => line.startsWith('# '));
-                if (h1) {
-                    title = h1.replace('# ', '').trim();
-                } else {
-                    const firstLine = lines.find(line => line.trim().length > 3);
-                    if (firstLine) {
-                        title = firstLine.replace(/[\*\_#]/g, '').trim().substring(0, 60);
-                        if (firstLine.length > 60) title += '...';
-                    }
-                }
-
-                if (title) {
-                    this.editorTitle.textContent = title;
-                    this.editorTitle.classList.remove('placeholder-active');
-                }
+                let title = h1 ? h1.replace('# ', '').trim() : (lines.find(line => line.trim().length > 3) || '').replace(/[\*\_#]/g, '').trim().substring(0, 60);
+                if (title) this.editorTitle.textContent = title;
             }
 
             copyToClipboard(elementId, buttonElement) {
                 const element = document.getElementById(elementId);
                 if (!element || element.classList.contains('placeholder-active')) return;
-
                 const textToCopy = element.innerText;
                 
-                const textArea = document.createElement('textarea');
-                textArea.value = textToCopy;
-                textArea.style.position = 'fixed';
-                textArea.style.top = '0';
-                textArea.style.left = '0';
-                textArea.style.opacity = '0';
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-
-                try {
-                    document.execCommand('copy');
-                    
+                navigator.clipboard.writeText(textToCopy).then(() => {
                     const icon = buttonElement.querySelector('i');
+                    buttonElement.classList.add('copied');
                     icon.classList.replace('fa-copy', 'fa-check');
                     setTimeout(() => {
                         icon.classList.replace('fa-check', 'fa-copy');
+                        buttonElement.classList.remove('copied');
                     }, 1500);
-
-                } catch (err) {
-                    console.error('Fallback: Oops, unable to copy', err);
-                }
-
-                document.body.removeChild(textArea);
+                }).catch(err => console.error('Failed to copy:', err));
             }
 
             createNewNote() {
-                this.currentNote = { id: `note_${Date.now()}` };
-                
                 ['rawTranscription', 'cleanedTranscript', 'polishedNote', 'editorTitle'].forEach(id => {
                     const el = document.getElementById(id);
                     const placeholder = el.getAttribute('placeholder') || '';
@@ -1014,46 +860,33 @@
                     else el.textContent = placeholder;
                     el.classList.add('placeholder-active');
                 });
-
                 this.recordingStatus.textContent = 'Ready to record';
-                this.progressIndicator.style.display = 'none';
-                this.statusIndicatorDiv.style.display = 'block';
-                if (this.isRecording) this.stopRecording();
+                this.updateProgress('off');
+                if (this.isRecording) this.cancelRecording();
+            }
+
+            async typeEffect(element, text, isMarkdown = false) {
+                element.classList.add('is-updating');
+                await new Promise(resolve => setTimeout(resolve, 400));
+                if (isMarkdown) element.innerHTML = marked.parse(text);
+                else element.textContent = text;
+                element.classList.remove('placeholder-active', 'is-updating');
             }
         }
         
         function setupPlaceholders() {
              document.querySelectorAll('[contenteditable][placeholder]').forEach(el => {
                 const placeholder = el.getAttribute('placeholder');
-
-                function updatePlaceholderState() {
-                    const text = (el.id === 'polishedNote' ? el.innerText : el.textContent).trim();
-                    if (text === '' || text === placeholder) {
-                        if (el.id === 'polishedNote' && text === '') el.innerHTML = placeholder;
-                        else if (text === '') el.textContent = placeholder;
-                        el.classList.add('placeholder-active');
-                    } else {
-                        el.classList.remove('placeholder-active');
-                    }
-                }
-
-                updatePlaceholderState();
-
-                el.addEventListener('focus', function () {
-                    if (this.classList.contains('placeholder-active')) {
-                        if (this.id === 'polishedNote') this.innerHTML = '';
-                        else this.textContent = '';
-                        this.classList.remove('placeholder-active');
-                    }
-                });
-                
-                el.addEventListener('blur', updatePlaceholderState);
+                const updateState = () => el.classList.toggle('placeholder-active', el.innerText.trim() === '' || el.innerText.trim() === placeholder);
+                updateState();
+                el.addEventListener('focus', () => { if (el.classList.contains('placeholder-active')) el.textContent = ''; });
+                el.addEventListener('blur', () => { if (el.textContent.trim() === '') el.textContent = placeholder; updateState(); });
             });
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
             const app = new VoiceNotesApp();
-            await app.init(); // Initialize and ask for permission
+            await app.init();
             setupPlaceholders();
         });
     </script>
