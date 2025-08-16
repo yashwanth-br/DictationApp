@@ -191,7 +191,6 @@
             overflow: hidden;
         }
         
-        /* --- Animated UI Elements --- */
         .hidable {
             transition: opacity 0.4s ease, transform 0.4s ease;
             opacity: 1;
@@ -201,7 +200,7 @@
             opacity: 0;
             pointer-events: none;
             transform: translateY(10px);
-            position: absolute; /* Take out of layout flow when hidden */
+            position: absolute;
         }
         #liveWaveformCanvas { height: 60px; width: 100%; margin-bottom: 15px; }
 
@@ -289,18 +288,50 @@
             background-color: var(--color-cancel);
             color: white;
         }
-
+        
+        /* --- New Progress Bar Styles --- */
         .progress-indicator {
+            width: 100%;
+            max-width: 350px;
+            position: relative;
+            padding: 10px 0;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 10px;
-            font-size: 0.9em;
-            color: var(--text-secondary-color);
+        }
+        .progress-steps-container {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            position: relative;
+            z-index: 2;
+        }
+        .progress-line-bg {
+            position: absolute;
+            top: 26px; /* Align with the center of the dots */
+            left: 15%;
+            right: 15%;
+            height: 4px;
+            background-color: var(--border-color);
+            border-radius: 2px;
+            z-index: 1;
+        }
+        .progress-line-fill {
+            height: 100%;
+            width: 100%;
+            background-color: var(--color-success);
+            border-radius: 2px;
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
         }
         .progress-step {
             display: flex;
+            flex-direction: column; /* Stack dot and label */
             align-items: center;
-            gap: 5px;
+            gap: 8px;
+            font-size: 0.9em;
+            color: var(--text-secondary-color);
             transition: color 0.4s, transform 0.4s;
         }
         .progress-step.active {
@@ -309,13 +340,15 @@
             transform: scale(1.05);
         }
         .progress-step.completed { color: var(--color-success); }
-
         .dot-container {
             width: 16px;
             height: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
+            background-color: var(--bg-color); /* To hide the line behind it */
+            border-radius: 50%;
+            padding: 4px;
         }
         .dot {
             width: 8px;
@@ -327,6 +360,9 @@
         .progress-step.active .dot {
             background-color: var(--color-recording);
             animation: pulse 1.5s infinite ease-in-out;
+        }
+        .progress-step.completed .dot {
+            background-color: var(--color-success);
         }
         .checkmark {
             display: none;
@@ -386,13 +422,16 @@
         <footer>
             <div class="recording-interface">
                 <div class="status-indicator hidable" id="recordingStatus">Ready to record</div>
+                <!-- Updated Progress Bar HTML -->
                 <div class="progress-indicator hidable is-hidden" id="progressIndicator">
-                    <!-- Progress steps -->
-                    <div class="progress-step" id="step1"><div class="dot-container"><div class="dot"></div><i class="fa-solid fa-check checkmark"></i></div><span class="label">Transcribing</span></div>
-                    <i class="fa-solid fa-arrow-right-long"></i>
-                    <div class="progress-step" id="step2"><div class="dot-container"><div class="dot"></div><i class="fa-solid fa-check checkmark"></i></div><span class="label">Cleaning</span></div>
-                    <i class="fa-solid fa-arrow-right-long"></i>
-                    <div class="progress-step" id="step3"><div class="dot-container"><div class="dot"></div><i class="fa-solid fa-check checkmark"></i></div><span class="label">Polishing</span></div>
+                    <div class="progress-line-bg">
+                        <div class="progress-line-fill" id="progressLineFill"></div>
+                    </div>
+                    <div class="progress-steps-container">
+                        <div class="progress-step" id="step1"><div class="dot-container"><div class="dot"></div><i class="fa-solid fa-check checkmark"></i></div><span class="label">Transcribing</span></div>
+                        <div class="progress-step" id="step2"><div class="dot-container"><div class="dot"></div><i class="fa-solid fa-check checkmark"></i></div><span class="label">Cleaning</span></div>
+                        <div class="progress-step" id="step3"><div class="dot-container"><div class="dot"></div><i class="fa-solid fa-check checkmark"></i></div><span class="label">Polishing</span></div>
+                    </div>
                 </div>
                 <div id="liveRecordingTitle" class="hidable is-hidden"></div>
                 <canvas id="liveWaveformCanvas" class="hidable is-hidden"></canvas>
@@ -469,6 +508,7 @@
                 // Dynamic Displays
                 this.recordingStatus = document.getElementById('recordingStatus');
                 this.progressIndicator = document.getElementById('progressIndicator');
+                this.progressLineFill = document.getElementById('progressLineFill'); // New element
                 this.liveRecordingTitle = document.getElementById('liveRecordingTitle');
                 this.liveWaveformCanvas = document.getElementById('liveWaveformCanvas');
                 this.liveWaveformCtx = this.liveWaveformCanvas.getContext('2d');
@@ -496,7 +536,7 @@
                 } catch (error) {
                     console.error("Mic permission error on load:", error);
                     this.recordingStatus.textContent = "Mic permission needed. Please allow and reload.";
-                    await this.populateMicList(); // Still try to populate, might be empty
+                    await this.populateMicList();
                 }
             }
 
@@ -673,7 +713,7 @@
                             if (this.stream) this.stream.getTracks().forEach(track => track.stop());
                             return;
                         }
-                        if (this.maxVolumeDuringRecording < 10) { // Silence threshold
+                        if (this.maxVolumeDuringRecording < 10) {
                             this.recordingStatus.textContent = 'Recording was silent. Check mic.';
                             this.typeEffect(this.rawTranscription, 'Recording appears to be silent. Please check your system microphone settings and ensure your mic is not muted.');
                             if (this.stream) this.stream.getTracks().forEach(track => track.stop());
@@ -734,9 +774,15 @@
                 return { inlineData: { data: base64Data, mimeType } };
             }
 
+            // --- Updated updateProgress function ---
             updateProgress(stage) {
                 this.progressIndicator.classList.toggle('is-hidden', stage === 'off');
                 this.recordingStatus.classList.toggle('is-hidden', stage !== 'off');
+                
+                let scaleX = 0;
+                if (stage === 'processing') scaleX = 0.5;
+                if (stage === 'complete') scaleX = 1;
+                this.progressLineFill.style.transform = `scaleX(${scaleX})`;
                 
                 const steps = {
                     step1: { el: document.getElementById('step1'), label: 'Transcribing', past: 'Transcribed' },
@@ -749,12 +795,12 @@
                     s.el.querySelector('.label').textContent = s.label;
                 });
 
-                if (stage === 'transcribing') steps.step1.el.classList.add('active');
-                else if (stage === 'processing') {
+                if (stage === 'transcribing') {
+                    steps.step1.el.classList.add('active');
+                } else if (stage === 'processing') {
                     steps.step1.el.classList.add('completed');
                     steps.step1.el.querySelector('.label').textContent = steps.step1.past;
                     steps.step2.el.classList.add('active');
-                    steps.step3.el.classList.add('active');
                 } else if (stage === 'complete') {
                     Object.values(steps).forEach(s => {
                         s.el.classList.remove('active');
