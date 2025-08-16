@@ -17,6 +17,7 @@
             --border-color: #3a3a3c;
             --color-recording: #ff3b30;
             --color-placeholder: #6a6a6e;
+            --color-cancel: #5856d6;
         }
 
         body.light-mode {
@@ -183,6 +184,13 @@
             border-color: var(--color-recording);
         }
 
+        .button-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-top: 15px;
+        }
+
         #recordButton {
             width: 70px;
             height: 70px;
@@ -194,7 +202,6 @@
             justify-content: center;
             align-items: center;
             transition: transform 0.2s, box-shadow 0.2s;
-            margin-top: 15px;
         }
         #recordButton:hover { transform: scale(1.05); }
         .record-button-inner {
@@ -210,6 +217,25 @@
         
         #recordButton.recording .record-button-inner i.fa-stop {
             border-radius: 4px; /* Makes the stop icon a square */
+        }
+
+        #cancelButton {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 1px solid var(--border-color);
+            background-color: var(--ui-color);
+            color: var(--text-secondary-color);
+            cursor: pointer;
+            display: none; /* Initially hidden */
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2em;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        #cancelButton:hover {
+            background-color: var(--color-cancel);
+            color: white;
         }
 
         /* Responsive Design */
@@ -260,11 +286,16 @@
                     <select id="micSelect" class="mic-select" title="Select Microphone"></select>
                 </div>
 
-                <button id="recordButton" title="Start Recording">
-                    <div class="record-button-inner">
-                        <i class="fa-solid fa-microphone"></i>
-                    </div>
-                </button>
+                <div class="button-wrapper">
+                    <button id="recordButton" title="Start Recording">
+                        <div class="record-button-inner">
+                            <i class="fa-solid fa-microphone"></i>
+                        </div>
+                    </button>
+                    <button id="cancelButton" title="Cancel Recording">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
             </div>
         </footer>
     </div>
@@ -293,6 +324,7 @@
                 this.mediaRecorder = null;
                 this.audioChunks = [];
                 this.isRecording = false;
+                this.isCancelled = false;
                 this.currentNote = null;
                 this.stream = null;
                 
@@ -307,6 +339,7 @@
 
                 // Bind HTML Elements
                 this.recordButton = document.getElementById('recordButton');
+                this.cancelButton = document.getElementById('cancelButton');
                 this.recordingStatus = document.getElementById('recordingStatus');
                 this.rawTranscription = document.getElementById('rawTranscription');
                 this.polishedNote = document.getElementById('polishedNote');
@@ -332,22 +365,19 @@
 
             async init() {
                 try {
-                    // Request permission on load to get device labels
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    // We don't need to keep the stream running, so stop it immediately.
                     stream.getTracks().forEach(track => track.stop());
-                    // Now that we have permission, populate the list with full device labels.
                     await this.populateMicList();
                 } catch (error) {
                     console.error("Error getting microphone permission on load:", error);
                     this.recordingStatus.textContent = "Mic permission needed. Please allow and reload.";
-                    // Still try to populate the list; it might show an error or default devices.
                     await this.populateMicList();
                 }
             }
 
             bindEventListeners() {
                 this.recordButton.addEventListener('click', () => this.toggleRecording());
+                this.cancelButton.addEventListener('click', () => this.cancelRecording());
                 this.newButton.addEventListener('click', () => this.createNewNote());
                 this.themeToggleButton.addEventListener('click', () => this.toggleTheme());
                 this.copyRawButton.addEventListener('click', () => this.copyToClipboard('rawTranscription', this.copyRawButton));
@@ -367,7 +397,7 @@
                     const audioInputs = devices.filter(device => device.kind === 'audioinput');
                     
                     const currentMicValue = this.micSelect.value;
-                    this.micSelect.innerHTML = ''; // Clear existing options
+                    this.micSelect.innerHTML = '';
                     
                     if (audioInputs.length === 0) {
                         this.micSelect.innerHTML = '<option>No microphones found</option>';
@@ -383,7 +413,6 @@
                         this.micSelect.appendChild(option);
                     });
                     
-                    // Try to re-select the previously saved or current mic
                     if (savedMicId && audioInputs.some(d => d.deviceId === savedMicId)) {
                         this.micSelect.value = savedMicId;
                     } else if (currentMicValue && audioInputs.some(d => d.deviceId === currentMicValue)) {
@@ -511,6 +540,7 @@
                 this.liveWaveformCanvas.style.display = 'block';
                 this.liveRecordingTimerDisplay.style.display = 'block';
                 this.statusIndicatorDiv.style.display = 'none';
+                this.cancelButton.style.display = 'flex';
 
                 this.setupCanvasDimensions();
                 
@@ -535,6 +565,7 @@
                 this.liveWaveformCanvas.style.display = 'none';
                 this.liveRecordingTimerDisplay.style.display = 'none';
                 this.statusIndicatorDiv.style.display = 'block';
+                this.cancelButton.style.display = 'none';
                 
                 const iconElement = this.recordButton.querySelector('i');
                 iconElement.classList.replace('fa-stop', 'fa-microphone');
@@ -551,11 +582,37 @@
                 this.audioContext = null;
             }
 
+            setupMediaSession() {
+                if ('mediaSession' in navigator) {
+                    navigator.mediaSession.metadata = new MediaMetadata({
+                        title: 'AI Voice Note Recording',
+                        artist: 'DictationApp',
+                    });
+
+                    navigator.mediaSession.setActionHandler('pause', () => {
+                        if (this.isRecording) this.stopRecording();
+                    });
+                    
+                    navigator.mediaSession.setActionHandler('stop', () => {
+                        if (this.isRecording) this.stopRecording();
+                    });
+                }
+            }
+
+            clearMediaSession() {
+                if ('mediaSession' in navigator) {
+                    navigator.mediaSession.metadata = null;
+                    navigator.mediaSession.setActionHandler('pause', null);
+                    navigator.mediaSession.setActionHandler('stop', null);
+                }
+            }
+
             async startRecording() {
                 try {
                     this.audioChunks = [];
                     this.maxVolumeDuringRecording = 0;
-                    this.recordingStatus.textContent = 'Requesting mic access...';
+                    this.isCancelled = false;
+                    this.recordingStatus.textContent = 'Recording...';
                     
                     const selectedMicId = this.micSelect.value;
                     const constraints = {
@@ -574,7 +631,14 @@
 
                     this.mediaRecorder.onstop = () => {
                         this.stopLiveDisplay();
+                        this.clearMediaSession();
                         
+                        if (this.isCancelled) {
+                            if (this.stream) this.stream.getTracks().forEach(track => track.stop());
+                            this.stream = null;
+                            return;
+                        }
+
                         const SILENCE_THRESHOLD = 10;
                         if (this.maxVolumeDuringRecording < SILENCE_THRESHOLD) {
                             this.recordingStatus.textContent = 'Recording was silent. Check mic volume.';
@@ -595,9 +659,10 @@
 
                     this.mediaRecorder.start();
                     this.isRecording = true;
+                    this.setupMediaSession();
                     this.recordButton.classList.add('recording');
                     this.recordButton.setAttribute('title', 'Stop Recording');
-                    this.micSelect.disabled = true; // Disable selector during recording
+                    this.micSelect.disabled = true;
                     this.startLiveDisplay();
 
                 } catch (error) {
@@ -615,9 +680,23 @@
                     this.isRecording = false;
                     this.recordButton.classList.remove('recording');
                     this.recordButton.setAttribute('title', 'Start Recording');
-                    this.micSelect.disabled = false; // Re-enable selector
+                    this.micSelect.disabled = false;
                     this.recordingStatus.textContent = 'Processing audio...';
                 }
+            }
+
+            cancelRecording() {
+                if (!this.isRecording) return;
+                
+                this.isCancelled = true;
+                this.mediaRecorder.stop();
+
+                this.isRecording = false;
+                this.recordButton.classList.remove('recording');
+                this.recordButton.setAttribute('title', 'Start Recording');
+                this.micSelect.disabled = false;
+                this.recordingStatus.textContent = 'Recording cancelled. Ready to record.';
+                this.stopLiveDisplay();
             }
             
             async fileToGenerativePart(blob, mimeType) {
