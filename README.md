@@ -10,19 +10,24 @@ A simple, powerful, single-file web application that uses the Google Gemini API 
 ## ✨ Features
 
 -   **🎙️ Live Audio Recording:** Capture voice notes directly in your browser.
+-   **🎤 Microphone Selector:** Choose your preferred input device from a dropdown list of all connected microphones.
+-   **🎧 External Device Control:** Start and stop recordings using media controls from your earbuds or keyboard.
 -   **🌊 Real-time Visualization:** See your voice visualized as a waveform while you speak.
--   **🤖 AI-Powered Transcription:** Get a raw, word-for-word transcript of your recording using the Gemini 1.5 Flash model.
--   **✍️ AI-Powered Polishing:** Automatically transform the raw transcript into a polished, well-formatted note with corrected grammar, removed filler words, and markdown formatting.
--   **📋 Copy to Clipboard:** Easily copy the raw or polished text with a single click.
+-   **🤖 Multi-Stage AI Processing:**
+    -   **Raw Transcript:** Get a raw, word-for-word transcript of your recording.
+    -   **Cleaned Transcript:** An intermediate version that removes filler words and stutters while preserving the conversational flow.
+    -   **Polished Note:** A final, well-formatted note with corrected grammar and markdown structure.
+-   **❌ Cancel Recording:** Discard a recording with a single click without sending it to the API.
+-   **📋 Copy to Clipboard:** Easily copy text from any of the three panes.
 -   **🔇 Silence Detection:** Intelligently detects if a recording is silent to provide instant feedback and save API calls.
 -   **🌗 Light & Dark Modes:** Toggle between themes for comfortable viewing.
--   **📁 Single File, No Dependencies:** Runs entirely from a single `DictationApp.html` file with no installation required.
+-   **📁 Single File, No Dependencies:** Runs entirely from a single HTML file with no installation required.
 
 ---
 
 ## 🚀 How to Use
 
-Because this application requires microphone access, you cannot run it by simply opening the `DictationApp.html` file in your browser. You must serve it from a local web server. The easiest way to do this is with the **Live Server** extension in Visual Studio Code.
+Because this application requires microphone access, you must serve it from a local web server. The easiest way to do this is with the **Live Server** extension in Visual Studio Code.
 
 ### Prerequisites
 
@@ -53,7 +58,8 @@ Because this application requires microphone access, you cannot run it by simply
     -   Your browser will automatically open with the application running.
 
 4.  **Start Recording:**
-    -   The browser will ask for microphone permission. Click **Allow**.
+    -   The browser will ask for microphone permission when the page loads. Click **Allow**.
+    -   Select your desired microphone from the dropdown.
     -   Click the red microphone button to start and stop recording!
 
 ---
@@ -64,6 +70,8 @@ Because this application requires microphone access, you cannot run it by simply
 -   **CSS3**
 -   **Vanilla JavaScript**
 -   **Google Gemini API:** For AI-powered transcription and text polishing.
+-   **Web Audio API:** For audio visualization.
+-   **Media Session API:** For earbud/keyboard media controls.
 -   **Marked.js:** To convert the AI's markdown response into formatted HTML.
 -   **Font Awesome:** For icons.
 
