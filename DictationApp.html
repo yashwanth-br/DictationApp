@@ -490,7 +490,7 @@
             <div class="editor-pane">
                 <div class="editor-pane-header">
                     <h3>Polished Note</h3>
-                    <button id="copyPolishedButton" class="copy-button" title="Copy to Clipboard"><i class="fa-solid fa-copy"></i></button>
+                    <button id="copyPolishedButton" class="copy-button" title="Copy to Clipboard (Ctrl+C)"><i class="fa-solid fa-copy"></i></button>
                 </div>
                 <div id="polishedNote" class="editor-content" contenteditable="true" placeholder="The polished, AI-formatted note will appear here..."></div>
             </div>
@@ -499,7 +499,7 @@
         <footer>
             <div class="recording-interface">
                 <div id="dynamicContentWrapper">
-                    <div class="status-indicator hidable" id="recordingStatus">Ready to record</div>
+                    <div class="status-indicator hidable" id="recordingStatus">Ready to record (Space Bar)</div>
                     <div class="progress-indicator hidable is-hidden" id="progressIndicator">
                         <div class="progress-line-bg">
                             <div class="progress-line-fill" id="progressLineFill"></div>
@@ -523,10 +523,10 @@
                 </div>
 
                 <div class="button-wrapper">
-                    <button id="recordButton" title="Start Recording">
+                    <button id="recordButton" title="Start/Stop Recording (Space Bar)">
                         <div class="record-button-inner"><i class="fa-solid fa-microphone"></i></div>
                     </button>
-                    <button id="cancelButton" title="Cancel Recording"><i class="fa-solid fa-xmark"></i></button>
+                    <button id="cancelButton" title="Cancel Recording (Escape)"><i class="fa-solid fa-xmark"></i></button>
                 </div>
             </div>
         </footer>
@@ -538,16 +538,19 @@
         import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
         
         const GEMINI_API_KEY = "AIzaSyBxTxlsEWktNIIwBORKaGJwvOue45lRjMk"; // PASTE YOUR GEMINI API KEY HERE
-        const MODEL_NAME = "gemini-1.5-flash";
+        const MODEL_NAME = "gemini-2.5-pro";
 
         class VoiceNotesApp {
             constructor() {
                 if (!GEMINI_API_KEY) {
-                    alert("Please set your GEMINI_API_KEY in the script tag.");
-                    return;
+                    // A simple, non-blocking notification
+                    const warning = document.createElement('div');
+                    warning.textContent = 'Please set your Gemini API Key in the script to enable AI features.';
+                    warning.style.cssText = 'position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: #ffc107; color: black; padding: 10px 20px; border-radius: 8px; z-index: 1000; font-weight: bold;';
+                    document.body.appendChild(warning);
                 }
                 
-                this.genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+                this.genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
                 this.isRecording = false;
                 this.isCancelled = false;
                 this.audioChunks = [];
@@ -608,6 +611,42 @@
                 this.micSelect.addEventListener('change', () => localStorage.setItem('selectedMicId', this.micSelect.value));
                 navigator.mediaDevices.addEventListener('devicechange', () => this.populateMicList());
                 window.addEventListener('resize', () => this.handleResize());
+                
+                // --- KEYBOARD SHORTCUTS ---
+                document.addEventListener('keydown', (e) => this.handleKeydown(e));
+            }
+            
+            handleKeydown(event) {
+                const activeElement = document.activeElement;
+                const isEditing = activeElement && activeElement.isContentEditable;
+
+                // Space Bar: Start/Stop recording
+                // We only trigger this if the user is not currently typing in an editable field.
+                if (event.code === 'Space' && !isEditing) {
+                    event.preventDefault(); // Prevent default browser action (e.g., scrolling)
+                    this.toggleRecording();
+                }
+
+                // Escape key: Cancel recording
+                // This shortcut works even if editing, as it's a global cancel action.
+                if (event.key === 'Escape') {
+                    if (this.isRecording) {
+                        event.preventDefault(); // Prevent any other 'Escape' behavior
+                        this.cancelRecording();
+                    }
+                }
+
+                // Control + C: Copy polished notes
+                // This is a global shortcut to quickly get the final output.
+                if (event.ctrlKey && (event.key === 'c' || event.key === 'C')) {
+                    // To avoid interfering with normal copy behavior, we check that the user
+                    // isn't trying to copy text from the other two editable panes.
+                    if (activeElement === this.rawTranscription || activeElement === this.cleanedTranscript) {
+                        return; // Allow the default copy behavior to proceed
+                    }
+                    event.preventDefault(); // Prevent the default copy action
+                    this.copyToClipboard('polishedNote', this.copyPolishedButton);
+                }
             }
             
             async init() {
@@ -806,7 +845,7 @@
                     this.mediaRecorder.start();
                     this.isRecording = true;
                     this.recordButton.classList.add('recording');
-                    this.recordButton.setAttribute('title', 'Stop Recording');
+                    this.recordButton.setAttribute('title', 'Stop Recording (Space Bar)');
                     this.micSelect.disabled = true;
                     this.startLiveDisplay();
 
@@ -824,7 +863,7 @@
                     this.mediaRecorder.stop();
                     this.isRecording = false;
                     this.recordButton.classList.remove('recording');
-                    this.recordButton.setAttribute('title', 'Start Recording');
+                    this.recordButton.setAttribute('title', 'Start Recording (Space Bar)');
                     this.micSelect.disabled = false;
                     this.recordingStatus.textContent = 'Processing audio...';
                 }
@@ -836,7 +875,7 @@
                 this.mediaRecorder.stop();
                 this.isRecording = false;
                 this.recordButton.classList.remove('recording');
-                this.recordButton.setAttribute('title', 'Start Recording');
+                this.recordButton.setAttribute('title', 'Start Recording (Space Bar)');
                 this.micSelect.disabled = false;
                 this.recordingStatus.textContent = 'Recording cancelled. Ready to record.';
                 this.stopLiveDisplay();
@@ -888,6 +927,11 @@
             }
 
             async processAudio(audioBlob) {
+                if (!this.genAI) {
+                    this.recordingStatus.textContent = 'API Key not set. Cannot process audio.';
+                    this.typeEffect(this.rawTranscription, 'Error: Gemini API Key is missing. Please add it to the script to enable AI transcription and processing.');
+                    return;
+                }
                 try {
                     this.updateProgress('transcribing');
                     const model = this.genAI.getGenerativeModel({ model: MODEL_NAME });
@@ -962,15 +1006,23 @@
             copyToClipboard(elementId, buttonElement) {
                 const element = document.getElementById(elementId);
                 if (!element || element.classList.contains('placeholder-active')) return;
-                const textToCopy = element.innerText;
+                
+                // For the polished note, we want to copy the raw markdown, not the rendered HTML's innerText
+                const textToCopy = (elementId === 'polishedNote' && element.innerHTML) ? element.innerHTML : element.innerText;
                 
                 navigator.clipboard.writeText(textToCopy).then(() => {
                     const icon = buttonElement.querySelector('i');
                     buttonElement.classList.add('copied');
                     icon.classList.replace('fa-copy', 'fa-check');
+                    
+                    // Show a temporary "Copied!" message
+                    const originalTitle = buttonElement.title;
+                    buttonElement.title = "Copied!";
+
                     setTimeout(() => {
                         icon.classList.replace('fa-check', 'fa-copy');
                         buttonElement.classList.remove('copied');
+                        buttonElement.title = originalTitle;
                     }, 1500);
                 }).catch(err => console.error('Failed to copy:', err));
             }
@@ -983,7 +1035,7 @@
                     else el.textContent = placeholder;
                     el.classList.add('placeholder-active');
                 });
-                this.recordingStatus.textContent = 'Ready to record';
+                this.recordingStatus.textContent = 'Ready to record (Space Bar)';
                 this.updateProgress('off');
                 if (this.isRecording) this.cancelRecording();
             }
