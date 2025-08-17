@@ -19,6 +19,7 @@
             --color-placeholder: #6a6a6e;
             --color-cancel: #5856d6;
             --color-success: #34c759;
+            --color-primary-action: #0a84ff;
             --shadow-color: rgba(0, 0, 0, 0.2);
         }
 
@@ -98,6 +99,11 @@
             outline: none;
         }
 
+        .header-actions {
+            display: flex;
+            gap: 5px;
+        }
+
         .header-actions button {
             background: none;
             border: none;
@@ -137,7 +143,6 @@
             box-shadow: 0 8px 25px var(--shadow-color);
         }
         
-        /* --- Shine Effect Update --- */
         .editor-pane.shine-effect::after {
           content: '';
           position: absolute;
@@ -148,10 +153,10 @@
           background: linear-gradient(
             to right,
             rgba(255, 255, 255, 0) 0%,
-            rgba(255, 255, 255, 0.15) 50%, /* Made brighter */
+            rgba(255, 255, 255, 0.15) 50%,
             rgba(255, 255, 255, 0) 100%
           );
-          animation: shine-effect 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Made slower */
+          animation: shine-effect 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
           pointer-events: none;
         }
 
@@ -311,16 +316,14 @@
              transform: translateX(-45px) scale(1.05);
         }
 
-        /* --- Added Style --- */
         #recordButton:disabled {
             cursor: not-allowed;
             background-color: var(--border-color);
-            transform: scale(1) !important; /* Prevent hover effect when disabled */
+            transform: scale(1) !important;
         }
         #recordButton:disabled .record-button-inner i {
             color: var(--text-secondary-color);
         }
-        /* --- End Added Style --- */
 
         .button-wrapper.is-recording #recordButton {
             transform: translateX(-45px);
@@ -467,6 +470,86 @@
             50% { transform: scale(1.4); opacity: 0.7; }
         }
 
+        /* --- Settings Modal Styles --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal-overlay.is-visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-content {
+            background-color: var(--ui-color);
+            padding: 25px 30px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 30px var(--shadow-color);
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .modal-overlay.is-visible .modal-content {
+            transform: scale(1);
+        }
+        .modal-content h2 {
+            margin: 0;
+            font-size: 1.4em;
+            color: var(--text-color);
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .form-group label {
+            font-weight: 500;
+            color: var(--text-secondary-color);
+        }
+        .form-group input {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 1em;
+            font-family: var(--font-family);
+        }
+        .form-group input:focus {
+            outline: 2px solid var(--color-primary-action);
+            border-color: var(--color-primary-action);
+        }
+        .save-button {
+            background-color: var(--color-primary-action);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+        .save-button:hover {
+            background-color: #0a78e0;
+            transform: scale(1.02);
+        }
+
         @media (max-width: 992px) {
             main { grid-template-columns: 1fr; }
         }
@@ -480,6 +563,7 @@
             <div class="header-actions">
                 <button id="newButton" title="New Note"><i class="fa-solid fa-file-circle-plus"></i></button>
                 <button id="themeToggleButton" title="Toggle Theme"><i class="fa-solid fa-sun"></i></button>
+                <button id="settingsButton" title="Settings"><i class="fa-solid fa-gear"></i></button>
             </div>
         </header>
 
@@ -543,26 +627,31 @@
         </footer>
     </div>
     
+    <div id="settingsModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Settings</h2>
+            <div class="form-group">
+                <label for="apiKeyInput">Gemini API Key</label>
+                <input type="password" id="apiKeyInput" placeholder="Enter your API Key">
+            </div>
+            <div class="form-group">
+                <label for="modelNameInput">Model Name</label>
+                <input type="text" id="modelNameInput" placeholder="e.g., gemini-1.5-pro-latest">
+            </div>
+            <button id="saveSettingsButton" class="save-button">Save and Close</button>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
     <script type="module">
         import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
         
-        const GEMINI_API_KEY = "AIzaSyAEsfDhje3Huu6ZiKySwBdEsPdjlhdp8Yw"; // PASTE YOUR GEMINI API KEY HERE
-        // Using a more powerful model like Gemini 1.5 Pro is recommended for reliable JSON output.
-        const MODEL_NAME = "gemini-2.5-pro";
-
         class VoiceNotesApp {
             constructor() {
-                if (!GEMINI_API_KEY) {
-                    // A simple, non-blocking notification
-                    const warning = document.createElement('div');
-                    warning.textContent = 'Please set your Gemini API Key in the script to enable AI features.';
-                    warning.style.cssText = 'position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: #ffc107; color: black; padding: 10px 20px; border-radius: 8px; z-index: 1000; font-weight: bold;';
-                    document.body.appendChild(warning);
-                }
-                
-                this.genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
+                this.apiKey = null;
+                this.modelName = 'gemini-1.5-pro-latest';
+                this.genAI = null;
                 this.isRecording = false;
                 this.isCancelled = false;
                 this.audioChunks = [];
@@ -578,8 +667,33 @@
 
                 this.bindElements();
                 this.bindEventListeners();
+                this.loadSettingsAndInitAI();
                 this.initTheme();
                 this.createNewNote();
+            }
+            
+            loadSettingsAndInitAI() {
+                this.apiKey = localStorage.getItem('geminiApiKey') || '';
+                this.modelName = localStorage.getItem('geminiModelName') || 'gemini-1.5-pro-latest';
+                this.initializeGenerativeAI();
+            }
+            
+            initializeGenerativeAI() {
+                if (this.apiKey) {
+                    this.genAI = new GoogleGenerativeAI(this.apiKey);
+                    const warning = document.getElementById('apiWarning');
+                    if (warning) warning.remove();
+                } else {
+                    this.genAI = null;
+                    if (!document.getElementById('apiWarning')) {
+                        const warning = document.createElement('div');
+                        warning.id = 'apiWarning';
+                        warning.textContent = 'Please set your Gemini API Key in Settings to enable AI features.';
+                        warning.style.cssText = 'position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: #ffc107; color: black; padding: 10px 20px; border-radius: 8px; z-index: 1000; font-weight: bold; cursor: pointer;';
+                        warning.onclick = () => this.openSettings();
+                        document.body.appendChild(warning);
+                    }
+                }
             }
 
             bindElements() {
@@ -610,6 +724,13 @@
                 this.liveWaveformCanvas = document.getElementById('liveWaveformCanvas');
                 this.liveWaveformCtx = this.liveWaveformCanvas.getContext('2d');
                 this.liveRecordingTimerDisplay = document.getElementById('liveRecordingTimerDisplay');
+
+                // Settings Modal
+                this.settingsButton = document.getElementById('settingsButton');
+                this.settingsModal = document.getElementById('settingsModal');
+                this.apiKeyInput = document.getElementById('apiKeyInput');
+                this.modelNameInput = document.getElementById('modelNameInput');
+                this.saveSettingsButton = document.getElementById('saveSettingsButton');
             }
 
             bindEventListeners() {
@@ -624,36 +745,64 @@
                 navigator.mediaDevices.addEventListener('devicechange', () => this.populateMicList());
                 window.addEventListener('resize', () => this.handleResize());
                 
-                // --- KEYBOARD SHORTCUTS ---
+                // Settings Listeners
+                this.settingsButton.addEventListener('click', () => this.openSettings());
+                this.saveSettingsButton.addEventListener('click', () => this.saveSettings());
+                this.settingsModal.addEventListener('click', (e) => {
+                    if (e.target === this.settingsModal) this.closeSettings();
+                });
+
                 document.addEventListener('keydown', (e) => this.handleKeydown(e));
             }
             
             handleKeydown(event) {
                 const activeElement = document.activeElement;
-                const isEditing = activeElement && activeElement.isContentEditable;
+                const isEditing = activeElement && (activeElement.isContentEditable || activeElement.tagName === 'INPUT');
 
-                // Space Bar: Start/Stop recording
-                if (event.code === 'Space' && !isEditing) {
-                    event.preventDefault();
-                    this.toggleRecording();
-                }
-
-                // Escape key: Cancel recording
                 if (event.key === 'Escape') {
-                    if (this.isRecording) {
+                    if (this.settingsModal.classList.contains('is-visible')) {
+                        this.closeSettings();
+                    } else if (this.isRecording) {
                         event.preventDefault();
                         this.cancelRecording();
                     }
                 }
 
-                // Control + C: Copy polished notes
+                if (isEditing) return;
+
+                if (event.code === 'Space') {
+                    event.preventDefault();
+                    this.toggleRecording();
+                }
+
                 if (event.ctrlKey && (event.key === 'c' || event.key === 'C')) {
-                    if (activeElement === this.rawTranscription || activeElement === this.cleanedTranscript) {
-                        return; 
-                    }
                     event.preventDefault();
                     this.copyToClipboard('polishedNote', this.copyPolishedButton);
                 }
+            }
+            
+            openSettings() {
+                this.apiKeyInput.value = this.apiKey;
+                this.modelNameInput.value = this.modelName;
+                this.settingsModal.classList.add('is-visible');
+            }
+
+            closeSettings() {
+                this.settingsModal.classList.remove('is-visible');
+            }
+
+            saveSettings() {
+                const newApiKey = this.apiKeyInput.value.trim();
+                const newModelName = this.modelNameInput.value.trim();
+                
+                localStorage.setItem('geminiApiKey', newApiKey);
+                localStorage.setItem('geminiModelName', newModelName);
+
+                this.apiKey = newApiKey;
+                this.modelName = newModelName;
+
+                this.initializeGenerativeAI();
+                this.closeSettings();
             }
             
             async init() {
@@ -727,6 +876,7 @@
             }
 
             async toggleRecording() {
+                if (this.recordButton.disabled) return;
                 this.isRecording ? this.stopRecording() : this.startRecording();
             }
             
@@ -831,20 +981,19 @@
                     this.mediaRecorder = new MediaRecorder(this.stream);
                     this.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) this.audioChunks.push(e.data) };
                     
-                    // --- Modified onstop handler ---
                     this.mediaRecorder.onstop = () => {
                         this.stopLiveDisplay();
                         if (this.stream) this.stream.getTracks().forEach(track => track.stop());
 
                         if (this.isCancelled) {
-                            this.recordButton.disabled = false; // Re-enable on cancel
+                            this.recordButton.disabled = false;
                             return;
                         }
 
                         if (this.maxVolumeDuringRecording < 10) {
                             this.recordingStatus.textContent = 'Recording was silent. Check mic.';
                             this.typeEffect(this.rawTranscription, 'Recording appears to be silent. Please check your system microphone settings and ensure your mic is not muted.');
-                            this.recordButton.disabled = false; // Re-enable on silent recording
+                            this.recordButton.disabled = false;
                             return;
                         }
 
@@ -852,7 +1001,7 @@
                             const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
                             this.processAudio(audioBlob);
                         } else {
-                            this.recordButton.disabled = false; // Re-enable if no audio was captured
+                            this.recordButton.disabled = false;
                         }
                     };
 
@@ -880,7 +1029,7 @@
                     this.recordButton.setAttribute('title', 'Start Recording (Space Bar)');
                     this.micSelect.disabled = false;
                     this.recordingStatus.textContent = 'Processing audio...';
-                    this.recordButton.disabled = true; // --- Disable button on stop ---
+                    this.recordButton.disabled = true;
                 }
             }
 
@@ -945,13 +1094,13 @@
                 if (!this.genAI) {
                     this.recordingStatus.textContent = 'API Key not set. Cannot process audio.';
                     this.typeEffect(this.rawTranscription, 'Error: Gemini API Key is missing. Please add it to the script to enable AI transcription and processing.');
-                    this.recordButton.disabled = false; // Re-enable on early exit
+                    this.recordButton.disabled = false;
                     return;
                 }
                 try {
                     this.updateProgress('transcribing');
                     const model = this.genAI.getGenerativeModel({ 
-                        model: MODEL_NAME,
+                        model: this.modelName,
                         generationConfig: { responseMimeType: "application/json" }
                     });
                     const audioPart = await this.fileToGenerativePart(audioBlob, audioBlob.type);
@@ -1003,7 +1152,7 @@
                     this.typeEffect(this.rawTranscription, `Could not process the audio. ${error.message} Please try recording again.`);
                     this.updateProgress('off');
                 } finally {
-                    this.recordButton.disabled = false; // --- Re-enable button after processing ---
+                    this.recordButton.disabled = false;
                 }
             }
             
