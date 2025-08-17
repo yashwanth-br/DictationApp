@@ -538,6 +538,7 @@
         import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
         
         const GEMINI_API_KEY = "AIzaSyBxTxlsEWktNIIwBORKaGJwvOue45lRjMk"; // PASTE YOUR GEMINI API KEY HERE
+        // Using a more powerful model like Gemini 1.5 Pro is recommended for reliable JSON output.
         const MODEL_NAME = "gemini-2.5-pro";
 
         class VoiceNotesApp {
@@ -621,30 +622,25 @@
                 const isEditing = activeElement && activeElement.isContentEditable;
 
                 // Space Bar: Start/Stop recording
-                // We only trigger this if the user is not currently typing in an editable field.
                 if (event.code === 'Space' && !isEditing) {
-                    event.preventDefault(); // Prevent default browser action (e.g., scrolling)
+                    event.preventDefault();
                     this.toggleRecording();
                 }
 
                 // Escape key: Cancel recording
-                // This shortcut works even if editing, as it's a global cancel action.
                 if (event.key === 'Escape') {
                     if (this.isRecording) {
-                        event.preventDefault(); // Prevent any other 'Escape' behavior
+                        event.preventDefault();
                         this.cancelRecording();
                     }
                 }
 
                 // Control + C: Copy polished notes
-                // This is a global shortcut to quickly get the final output.
                 if (event.ctrlKey && (event.key === 'c' || event.key === 'C')) {
-                    // To avoid interfering with normal copy behavior, we check that the user
-                    // isn't trying to copy text from the other two editable panes.
                     if (activeElement === this.rawTranscription || activeElement === this.cleanedTranscript) {
-                        return; // Allow the default copy behavior to proceed
+                        return; 
                     }
-                    event.preventDefault(); // Prevent the default copy action
+                    event.preventDefault();
                     this.copyToClipboard('polishedNote', this.copyPolishedButton);
                 }
             }
@@ -934,88 +930,86 @@
                 }
                 try {
                     this.updateProgress('transcribing');
-                    const model = this.genAI.getGenerativeModel({ model: MODEL_NAME });
+                    const model = this.genAI.getGenerativeModel({ 
+                        model: MODEL_NAME,
+                        generationConfig: { responseMimeType: "application/json" }
+                    });
                     const audioPart = await this.fileToGenerativePart(audioBlob, audioBlob.type);
                     
-                    const prompt = "Transcribe the spoken words in this audio. If no clear speech, respond with '[NO SPEECH DETECTED]'.";
-                    const result = await model.generateContent([prompt, audioPart]);
-                    const transcriptionText = result.response.text();
+                    const prompt = `
+                        Analyze the following audio and provide the output in a single JSON object.
+                        The JSON object must have three string keys: "rawTranscript", "cleanedTranscript", and "polishedNote".
 
-                    if (!transcriptionText || transcriptionText.includes('[NO SPEECH DETECTED]')) {
+                        1. "rawTranscript": Transcribe the spoken words in the audio verbatim. If no clear speech is detected, this field should contain the string "[NO SPEECH DETECTED]".
+                        2. "cleanedTranscript": Take the raw transcript and clean it up. Remove all filler words (like "um", "uh", "like"), stutters, and false starts. Do not summarize or rephrase the content, only clean it.
+                        3. "polishedNote": Take the core information from the transcript and format it into a polished, well-structured note using Markdown. Use headings, bullet points, and bolding where appropriate to make the information clear and easy to read. Correct any grammatical errors and spelling mistakes.
+
+                        Return ONLY the JSON object.
+                    `;
+
+                    const result = await model.generateContent([prompt, audioPart]);
+                    let responseText = result.response.text();
+                    
+                    // --- ERROR HANDLING AND JSON CLEANUP ---
+                    // The model might sometimes wrap the JSON in markdown backticks. Let's remove them.
+                    responseText = responseText.replace(/^```json\n/, '').replace(/\n```$/, '');
+
+                    let processedData;
+                    try {
+                        processedData = JSON.parse(responseText);
+                    } catch (e) {
+                        console.error("Failed to parse JSON:", responseText);
+                        throw new Error("The AI model returned an invalid format.");
+                    }
+
+
+                    if (!processedData.rawTranscript || processedData.rawTranscript.includes('[NO SPEECH DETECTED]')) {
                         throw new Error("No speech was detected in the audio.");
                     }
 
-                    await this.typeEffect(this.rawTranscription, transcriptionText);
+                    // Update UI sequentially for a better visual effect
                     this.updateProgress('processing');
-
-                    const cleanedPromise = this.getCleanedTranscript(transcriptionText);
-                    const polishedPromise = this.getPolishedNote(transcriptionText);
-
-                    cleanedPromise.then(text => { if (text) this.typeEffect(this.cleanedTranscript, text) });
-                    polishedPromise.then(text => { if (text) this.typeEffect(this.polishedNote, text, true) });
-
-                    await Promise.all([cleanedPromise, polishedPromise]);
-
+                    await this.typeEffect(this.rawTranscription, processedData.rawTranscript || '');
+                    await this.typeEffect(this.cleanedTranscript, processedData.cleanedTranscript || '');
+                    
                     this.updateProgress('complete');
+                    await this.typeEffect(this.polishedNote, processedData.polishedNote || '', true);
+                    this.setNoteTitle(processedData.polishedNote || '');
+
+
                     this.recordingStatus.textContent = 'Note processed! Ready to record.';
                     setTimeout(() => this.updateProgress('off'), 2000);
 
                 } catch (error) {
                     console.error("Error processing audio:", error);
-                    this.recordingStatus.textContent = error.message;
-                    this.typeEffect(this.rawTranscription, 'Could not detect speech. Please try recording again in a quieter environment.');
+                    this.recordingStatus.textContent = "Failed to process note. Please try again.";
+                    this.typeEffect(this.rawTranscription, `Could not process the audio. ${error.message} Please try recording again.`);
                     this.updateProgress('off');
-                }
-            }
-
-            async getCleanedTranscript(rawText) {
-                if (!rawText.trim()) return '';
-                try {
-                    const model = this.genAI.getGenerativeModel({ model: MODEL_NAME });
-                    const prompt = `Clean this transcript: remove filler words (um, uh, like), stutters, and false starts. Do NOT summarize or rephrase. Return only the cleaned text.\n\n---\n${rawText}`;
-                    const result = await model.generateContent(prompt);
-                    return result.response.text();
-                } catch (error) {
-                    console.error("Error cleaning transcript:", error);
-                    return 'Error during cleaning process.';
-                }
-            }
-
-            async getPolishedNote(rawText) {
-                if (!rawText.trim()) return '';
-                try {
-                    const model = this.genAI.getGenerativeModel({ model: MODEL_NAME });
-                    const prompt = `Turn this raw transcript into a polished, well-formatted note using markdown (headings, bullets, bolding). Correct grammar and spelling. Preserve all key information. Return only the formatted note.\n\n---\n${rawText}`;
-                    const result = await model.generateContent(prompt);
-                    const polishedText = result.response.text();
-                    if (polishedText) this.setNoteTitle(polishedText);
-                    return polishedText;
-                } catch (error) {
-                    console.error("Error polishing note:", error);
-                    return '<p><em>Polishing failed. Raw transcript is available.</em></p>';
                 }
             }
             
             setNoteTitle(polishedText) {
+                if (!polishedText) return;
                 const lines = polishedText.split('\n');
                 const h1 = lines.find(line => line.startsWith('# '));
                 let title = h1 ? h1.replace('# ', '').trim() : (lines.find(line => line.trim().length > 3) || '').replace(/[\*\_#]/g, '').trim().substring(0, 60);
-                if (title) this.editorTitle.textContent = title;
+                if (title) {
+                    this.editorTitle.textContent = title;
+                    this.editorTitle.classList.remove('placeholder-active');
+                }
             }
 
             copyToClipboard(elementId, buttonElement) {
                 const element = document.getElementById(elementId);
                 if (!element || element.classList.contains('placeholder-active')) return;
                 
-                // For the polished note, we want to copy the raw markdown, not the rendered HTML's innerText
-                const textToCopy = (elementId === 'polishedNote' && element.innerHTML) ? element.innerHTML : element.innerText;
+                const textToCopy = element.innerText;
                 
                 navigator.clipboard.writeText(textToCopy).then(() => {
                     const icon = buttonElement.querySelector('i');
                     buttonElement.classList.add('copied');
                     icon.classList.replace('fa-copy', 'fa-check');
                     
-                    // Show a temporary "Copied!" message
                     const originalTitle = buttonElement.title;
                     buttonElement.title = "Copied!";
 
@@ -1031,7 +1025,7 @@
                 ['rawTranscription', 'cleanedTranscript', 'polishedNote', 'editorTitle'].forEach(id => {
                     const el = document.getElementById(id);
                     const placeholder = el.getAttribute('placeholder') || '';
-                    if (id === 'polishedNote') el.innerHTML = placeholder;
+                    if (id === 'polishedNote') el.innerHTML = `<p>${placeholder}</p>`;
                     else el.textContent = placeholder;
                     el.classList.add('placeholder-active');
                 });
@@ -1042,7 +1036,7 @@
             
             async typeEffect(element, text, isMarkdown = false) {
                 element.classList.add('is-updating');
-                await new Promise(resolve => setTimeout(resolve, 400));
+                await new Promise(resolve => setTimeout(resolve, 250));
                 
                 if (isMarkdown) {
                     element.innerHTML = marked.parse(text);
@@ -1065,10 +1059,18 @@
         function setupPlaceholders() {
              document.querySelectorAll('[contenteditable][placeholder]').forEach(el => {
                 const placeholder = el.getAttribute('placeholder');
-                const updateState = () => el.classList.toggle('placeholder-active', el.innerText.trim() === '' || el.innerText.trim() === placeholder);
+                const updateState = () => {
+                    const isEmpty = el.textContent.trim() === '' || el.textContent.trim() === placeholder;
+                    el.classList.toggle('placeholder-active', isEmpty);
+                    if (isEmpty && el.id !== 'polishedNote') {
+                        el.textContent = placeholder;
+                    } else if (isEmpty && el.id === 'polishedNote') {
+                        el.innerHTML = `<p>${placeholder}</p>`;
+                    }
+                };
                 updateState();
                 el.addEventListener('focus', () => { if (el.classList.contains('placeholder-active')) el.textContent = ''; });
-                el.addEventListener('blur', () => { if (el.textContent.trim() === '') el.textContent = placeholder; updateState(); });
+                el.addEventListener('blur', updateState);
             });
         }
 
