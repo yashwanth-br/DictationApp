@@ -643,9 +643,12 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- MODIFICATION: Load the Gemini library from Google's CDN. This makes it available globally. -->
+    <script src="https://www.gstatic.com/ai/google-generative-ai.js"></script>
     
-    <script type="module">
-        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+    <!-- MODIFICATION: Changed script type from "module" to a regular script -->
+    <script>
+        // MODIFICATION: Removed the "import" statement as the library is now loaded globally.
         
         class VoiceNotesApp {
             constructor() {
@@ -680,6 +683,7 @@
             
             initializeGenerativeAI() {
                 if (this.apiKey) {
+                    // No change needed here, it finds the global `GoogleGenerativeAI` class
                     this.genAI = new GoogleGenerativeAI(this.apiKey);
                     const warning = document.getElementById('apiWarning');
                     if (warning) warning.remove();
