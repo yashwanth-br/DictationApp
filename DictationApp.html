@@ -643,12 +643,19 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- MODIFICATION: Load the Gemini library from Google's CDN. This makes it available globally. -->
-    <script src="https://www.gstatic.com/ai/google-generative-ai.js"></script>
     
-    <!-- MODIFICATION: Changed script type from "module" to a regular script -->
-    <script>
-        // MODIFICATION: Removed the "import" statement as the library is now loaded globally.
+    <!-- MODIFICATION: Switch to Import Map for robust library loading -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+      }
+    </script>
+    
+    <!-- MODIFICATION: Switch to type="module" -->
+    <script type="module">
+        import { GoogleGenerativeAI } from "@google/generative-ai";
         
         class VoiceNotesApp {
             constructor() {
@@ -682,21 +689,30 @@
             }
             
             initializeGenerativeAI() {
-                if (this.apiKey) {
-                    // No change needed here, it finds the global `GoogleGenerativeAI` class
-                    this.genAI = new GoogleGenerativeAI(this.apiKey);
-                    const warning = document.getElementById('apiWarning');
-                    if (warning) warning.remove();
-                } else {
-                    this.genAI = null;
-                    if (!document.getElementById('apiWarning')) {
-                        const warning = document.createElement('div');
-                        warning.id = 'apiWarning';
-                        warning.textContent = 'Please set your Gemini API Key in Settings to enable AI features.';
-                        warning.style.cssText = 'position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: #ffc107; color: black; padding: 10px 20px; border-radius: 8px; z-index: 1000; font-weight: bold; cursor: pointer;';
-                        warning.onclick = () => this.openSettings();
-                        document.body.appendChild(warning);
+                // Wrap in try-catch so it doesn't crash the app if key is bad
+                try {
+                    if (this.apiKey) {
+                        this.genAI = new GoogleGenerativeAI(this.apiKey);
+                        const warning = document.getElementById('apiWarning');
+                        if (warning) warning.remove();
+                    } else {
+                        this.genAI = null;
+                        this.showWarning();
                     }
+                } catch (error) {
+                    console.error("Failed to initialize AI:", error);
+                    this.genAI = null;
+                }
+            }
+            
+            showWarning() {
+                if (!document.getElementById('apiWarning')) {
+                    const warning = document.createElement('div');
+                    warning.id = 'apiWarning';
+                    warning.textContent = 'Please set your Gemini API Key in Settings to enable AI features.';
+                    warning.style.cssText = 'position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: #ffc107; color: black; padding: 10px 20px; border-radius: 8px; z-index: 1000; font-weight: bold; cursor: pointer;';
+                    warning.onclick = () => this.openSettings();
+                    document.body.appendChild(warning);
                 }
             }
 
@@ -806,6 +822,7 @@
                 this.modelName = newModelName;
 
                 this.initializeGenerativeAI();
+                // Close settings even if AI init fails (handled in try-catch above)
                 this.closeSettings();
             }
             
@@ -1246,11 +1263,10 @@
             });
         }
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            const app = new VoiceNotesApp();
-            await app.init();
-            setupPlaceholders();
-        });
+        // Initialize the app immediately since this is now a module
+        const app = new VoiceNotesApp();
+        await app.init();
+        setupPlaceholders();
     </script>
 
 </body>
